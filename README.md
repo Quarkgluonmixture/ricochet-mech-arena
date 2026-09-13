@@ -35,8 +35,10 @@ Open `?spectate` in the URL to start in spectator mode.
 - One arena (`MAP_A` in `src/sim/arena.ts`), 180°-rotation symmetric, 4 m corridors, **1.5 m walls**:
   they block shells (flying at 1.2 m) but not your 1.9 m eye, so you see the enemy's torso over the maze.
 - Shells fly at 16 m/s, bounce **once** off walls, die on the second wall or after 5 s. They hit anyone,
-  including the shooter after the first bounce or 0.15 s. One hit kills. **The first hit decides the
-  round**: survivors are invulnerable until the reset 2 s later (a trade in the same step is a draw).
+  including the shooter after the first bounce or 0.15 s. **You have three lives per round, the AI has
+  one.** A hit on you costs a life (red flash, camera shake, 1.2 s of invulnerability shown as a blue edge
+  glow); the last life pulses red under the score. The AI dies in one hit. **The first fatal hit decides
+  the round**: survivors are invulnerable until the reset 2 s later (a trade in the same step is a draw).
   The score counts rounds won: your kills, plus rounds the other side handed over with an own goal.
 - A shell leaves 1.13 m ahead of the mech, or just short of a wall if one is closer, so it can never be
   born inside a wall. Firing point-blank into a wall is an own goal.

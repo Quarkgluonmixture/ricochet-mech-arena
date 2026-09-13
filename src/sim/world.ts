@@ -9,7 +9,7 @@ export type WorldEvent =
   | { kind: 'dash'; pos: Vec2; mech: number }
   | { kind: 'bounce'; pos: Vec2; nx: number; nz: number; shell: number; owner: number }
   | { kind: 'expire'; pos: Vec2; shell: number; owner: number }
-  | { kind: 'hit'; pos: Vec2; shooter: number; victim: number; bounces: number; shell: number; /** shell velocity at impact */ vel: Vec2 }
+  | { kind: 'hit'; pos: Vec2; shooter: number; victim: number; bounces: number; shell: number; /** shell velocity at impact */ vel: Vec2; /** false = a life lost, the round goes on */ fatal: boolean; hpLeft: number }
   | { kind: 'round'; pos: Vec2 };
 
 export const MUZZLE_OFFSET = CFG.mech.radius + CFG.shell.radius + 0.25;
@@ -115,17 +115,25 @@ export class World {
   private hitTest(s: Shell): void {
     if (this.roundDecidedAt >= 0 && this.time !== this.roundDecidedAt) return;
     for (const m of this.mechs) {
-      if (!m.alive) continue;
+      if (!m.alive || m.invulnT > 0) continue;
       if (m.id === s.owner && s.bounces === 0 && s.age < CFG.shell.selfArmTime) continue;
       if (pointSegmentDist(m.pos, s.prev, s.pos) > m.radius + CFG.shell.radius) continue;
+      s.alive = false;
+      if (m.hp > 1) {
+        // a life lost, not a death: brief invulnerability so one volley cannot take them all
+        m.hp--;
+        m.invulnT = CFG.player.invulnTime;
+        this.events.push({ kind: 'hit', pos: { ...m.pos }, shooter: s.owner, victim: m.id, bounces: s.bounces, shell: s.id, vel: { ...s.vel }, fatal: false, hpLeft: m.hp });
+        return;
+      }
+      m.hp = 0;
       m.alive = false;
       m.deaths++;
       // the round goes to the shooter, or on an own goal to whoever is still standing
       const shooter = this.mechs[s.owner];
       const winner = shooter && shooter.id !== m.id ? shooter : this.mechs.find((o) => o.id !== m.id && o.alive);
       if (winner) winner.kills++;
-      s.alive = false;
-      this.events.push({ kind: 'hit', pos: { ...m.pos }, shooter: s.owner, victim: m.id, bounces: s.bounces, shell: s.id, vel: { ...s.vel } });
+      this.events.push({ kind: 'hit', pos: { ...m.pos }, shooter: s.owner, victim: m.id, bounces: s.bounces, shell: s.id, vel: { ...s.vel }, fatal: true, hpLeft: 0 });
       if (this.roundDecidedAt < 0) {
         this.roundDecidedAt = this.time;
         this.roundResetAt = this.time + CFG.round.respawnDelay;
@@ -155,6 +163,7 @@ export class World {
       m.pos = { ...sp };
       m.vel = { x: 0, z: 0 };
       m.alive = true;
+      m.hp = m.hpMax; m.invulnT = 0;
       m.dashT = 0; m.dashCd = 0; m.fireCd = 0; m.shellsOut = 0;
       const yaw = yaws[i % yaws.length];
       m.torsoYaw = yaw; m.legsYaw = yaw;

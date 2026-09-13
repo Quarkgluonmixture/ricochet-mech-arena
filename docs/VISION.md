@@ -65,6 +65,14 @@ floor or ceiling. Consequences that this repo relies on:
   mouse has none of these limits. Fire rate, slew rate and cone are the aggression knobs; dodge quality
   is never one.
 
+## §4c Lives (human vs AI only)
+
+The human has three lives per round; the AI has one. The asymmetry is deliberate and is the difficulty
+lever: the AI's dodge is perfect, so the human's error budget is what makes the duel winnable, while the
+AI's one-hit death keeps "geometry kills" crisp. A non-fatal hit costs a life, flashes the screen, shakes
+the camera and grants 1.2 s of invulnerability so a single volley cannot strip every life. The round is
+decided only by a fatal hit. In AI-vs-AI (spectate, attract) both mechs have one life.
+
 ## §4b Round resolution
 
 The first hit decides the round. From that step on every survivor is invulnerable and the AI stops

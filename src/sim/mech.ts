@@ -19,6 +19,11 @@ export interface Mech {
   torsoYaw: number;
   legsYaw: number;
   alive: boolean;
+  /** Hits left this round. AI mechs have 1; the human has CFG.player.lives. */
+  hp: number;
+  hpMax: number;
+  /** Seconds of invulnerability left after a non-fatal hit. */
+  invulnT: number;
   radius: number;
   dashT: number;
   dashCd: number;
@@ -40,7 +45,7 @@ export function makeMech(id: number, name: string, isPlayer: boolean, pos: Vec2,
     id, name, isPlayer,
     pos: { ...pos }, vel: { x: 0, z: 0 },
     torsoYaw: yaw, legsYaw: yaw,
-    alive: true, radius: CFG.mech.radius,
+    alive: true, hp: isPlayer ? CFG.player.lives : 1, hpMax: isPlayer ? CFG.player.lives : 1, invulnT: 0, radius: CFG.mech.radius,
     dashT: 0, dashCd: 0, dashDir: { x: 0, z: 0 },
     fireCd: 0,
     fireCooldown: isPlayer ? CFG.player.fireCooldown : CFG.ai.fireCooldown,
@@ -99,6 +104,7 @@ export function stepMech(m: Mech, input: MechInput, dt: number, walls: Aabb[]): 
   const r = stepMotion(m, input.move, input.dash, dt, walls);
   m.torsoYaw = input.torsoYaw;
   m.fireCd = Math.max(0, m.fireCd - dt);
+  m.invulnT = Math.max(0, m.invulnT - dt);
   // legs face the movement direction; standing still, they turn in place to face the torso
   const speed = len(m.vel);
   const target = speed > 0.5 ? yawOf(m.vel) : m.torsoYaw;

@@ -13,6 +13,7 @@ const SFX: Record<string, string[]> = {
   clank: ['clank_0', 'clank_1', 'clank_2', 'clank_3', 'clank_4'],
   explode: ['explode_0', 'explode_1', 'explode_2', 'explode_3', 'explode_4'],
   boom: ['boom_0', 'boom_1'],
+  damage: ['damage_0', 'damage_1', 'damage_2'],
   dash: ['dash'],
   hum: ['hum'],
   ui_click: ['ui_click'],
@@ -211,6 +212,12 @@ export class Audio {
     this.sample('boom', pos, 0.9, { pitchVar: 0.05, send: 0.3 });
   }
   dash(pos: Vec2): void { this.sample('dash', pos, 0.6, { pitch: 1.3, pitchVar: 0.1, send: 0.2 }); }
+  /** A life lost: heavy plate impact plus a low boom, unpositioned (it is you). */
+  damage(lastLife: boolean): void {
+    this.sample('damage', null, 0.9, { pitch: 0.8, pitchVar: 0.06, send: 0 });
+    this.sample('boom', null, 0.6, { pitch: 1.1, pitchVar: 0.05, send: 0 });
+    if (lastLife) this.ui('error');
+  }
   round(): void { this.sample('round', null, 0.5, { pitchVar: 0 }); }
   ui(kind: UiSound): void { this.sample(`ui_${kind}`, null, 0.5, { pitchVar: 0.02, send: 0 }); }
 

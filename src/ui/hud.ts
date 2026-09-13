@@ -40,8 +40,28 @@ export class Hud {
   private fps = $('fps');
   private splash = $('splash');
   private items = Array.from(document.querySelectorAll<HTMLButtonElement>('#menu-list .item'));
+  private lives = $('lives');
+  private lifePips: HTMLElement[] = [];
+  private damage = $('damage');
+  private shield = $('shield');
 
   /** Show the menu. `inProgress` turns the primary item into Resume. */
+  /** Life pips under the score; `last` turns the remaining one red and pulsing. */
+  setLives(hp: number, max: number): void {
+    while (this.lifePips.length < max) { const pip = document.createElement('i'); this.lives.appendChild(pip); this.lifePips.push(pip); }
+    while (this.lifePips.length > max) this.lifePips.pop()!.remove();
+    this.lifePips.forEach((pip, i) => pip.classList.toggle('lost', i >= hp));
+    this.lives.classList.toggle('last', max > 1 && hp === 1);
+    this.lives.style.display = max > 1 ? '' : 'none';
+  }
+  /** Red edge flash on taking a hit. */
+  flashDamage(): void {
+    this.damage.classList.remove('flash');
+    void this.damage.offsetWidth; // restart the animation
+    this.damage.classList.add('flash');
+  }
+  setShield(on: boolean): void { this.shield.classList.toggle('on', on); }
+
   setOverlay(visible: boolean, inProgress = false): void {
     this.overlay.classList.toggle('hidden', !visible);
     if (visible) this.playLabel.textContent = inProgress ? 'Resume' : 'Play';

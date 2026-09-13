@@ -82,6 +82,14 @@ function applyDuck(): void {
   audio.setDuck(attract ? 0.1 : paused ? 0 : 1, paused && !attract ? 0.35 : 1);
 }
 
+/** Both mechs on the AI brain fight on one life each; the human gets CFG.player.lives. */
+function applyLives(): void {
+  player.hpMax = aiVsAi() ? 1 : CFG.player.lives;
+  if (!player.alive) return;
+  // handing the blue mech back to the human mid-round: full lives, not the one it had as an AI
+  player.hp = aiVsAi() ? 1 : world.roundOver ? Math.min(player.hp, player.hpMax) : player.hpMax;
+}
+
 function setAttract(on: boolean): void {
   if (attract === on) return;
   attract = on;
@@ -89,6 +97,7 @@ function setAttract(on: boolean): void {
   spec.autoOrbit = on ? 0.05 : 0;
   rig.setViewmodelVisible(!on); // the cockpit gun is parented to the camera; the director cam must not carry it
   if (on) { spec.reset(); blueState.round = -1; aiState.round = -1; }
+  applyLives();
   applyDuck();
 }
 
@@ -112,6 +121,7 @@ function setSpectate(on: boolean): void {
     hud.setOverlay(!locked, gameStarted);
     if (!gameStarted) setAttract(true);
   }
+  applyLives();
   applyDuck();
 }
 
@@ -271,6 +281,18 @@ function handleEvents(): void {
         audio.dash(e.pos);
         break;
       case 'hit': {
+        if (!e.fatal) {
+          // a life lost: the round goes on
+          fx.bounce(e.pos.x, e.pos.z, -e.vel.x, -e.vel.z, e.victim === player.id ? COLORS.you : COLORS.ai);
+          if (e.victim === player.id && !aiVsAi()) {
+            hud.flashDamage();
+            rig.hurt();
+            audio.damage(e.hpLeft === 1);
+            hud.setLives(player.hp, player.hpMax);
+            hud.say('', 'ai', e.hpLeft === 1 ? `Last life. ${e.bounces > 0 ? `Bank shot from ${bearingWord(e.vel)}.` : 'Direct hit.'}` : `${e.hpLeft} lives left. ${e.bounces > 0 ? `Bank shot from ${bearingWord(e.vel)}.` : 'Direct hit.'}`, 1.6);
+          }
+          break;
+        }
         audio.hit(e.pos);
         fx.hit(e.pos.x, e.pos.z, e.victim === player.id ? COLORS.you : COLORS.ai);
         if (attract) break;
@@ -340,7 +362,9 @@ function frame(now: number): void {
   if (aiVsAi()) audio.setListener({ x: camera.position.x, z: camera.position.z }, spec.yaw());
   else audio.setListener(player.pos, player.torsoYaw);
   audio.syncHums(world.shells, player.id);
+  hud.setShield(!aiVsAi() && player.alive && player.invulnT > 0);
   if (!aiVsAi()) {
+    hud.setLives(player.hp, player.hpMax);
     radar.draw(world, player, enemy);
     const hfov = 2 * Math.atan(Math.tan((camera.fov * Math.PI) / 360) * camera.aspect);
     threat.draw(world, player, enemy, rig.mode === 'first' ? hfov / 2 : Math.PI * 0.4);

@@ -43,7 +43,14 @@ export const CFG = {
   },
 
   /** Many shells in flight: pressure is what makes the AI's footwork visible. */
-  player: { maxShells: 8, fireCooldown: 0.15 },
+  player: {
+    maxShells: 8,
+    fireCooldown: 0.15,
+    /** Human vs AI: the human takes this many hits per round; the AI still dies in one (VISION §4c). */
+    lives: 3,
+    /** Seconds of invulnerability after a non-fatal hit, so one volley cannot strip every life. */
+    invulnTime: 1.2,
+  },
 
   ai: {
     maxShells: 2,

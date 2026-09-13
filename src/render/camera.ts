@@ -51,6 +51,8 @@ export class CameraRig {
   }
 
   kick(): void { this.recoil = 1; this.shake = 1; }
+  /** Taking a hit: a bigger, longer shake than firing. */
+  hurt(): void { this.shake = 3.2; }
   setViewmodelVisible(v: boolean): void { this.viewmodel.visible = v; }
 
   toggle(): CamMode {

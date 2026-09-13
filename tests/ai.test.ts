@@ -91,6 +91,7 @@ describe('round resolution', () => {
       const a = world.addMech('ai', false, world.arena.spawns.enemy);
       const yaw = Math.atan2(-(a.pos.x - p.pos.x), -(a.pos.z - p.pos.z));
       p.torsoYaw = yaw;
+      p.hpMax = 1; p.hp = 1; // one life here: this test is about the round-decided rule, not lives
       a.maxShells = 0;
       // an AI shell already 1.5 m from the player, flying at it: lands in ~0.1 s
       world.shells.push({ id: 999, owner: a.id, pos: { x: p.pos.x + 1.5, z: p.pos.z }, prev: { x: p.pos.x + 1.5, z: p.pos.z }, vel: { x: -CFG.shell.speed, z: 0 }, bounces: 0, age: 1, alive: true });

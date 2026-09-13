@@ -24,6 +24,17 @@ html, body { margin: 0; height: 100%; background: #0b0e14; color: var(--ink); ov
 #score .vs { color: var(--dim); font-weight: 400; }
 
 #status { position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; }
+#lives { display: flex; gap: 8px; margin-bottom: 2px; }
+#lives i { width: 30px; height: 8px; border-radius: 2px; background: #9cf2c9; box-shadow: 0 0 10px rgba(156,242,201,0.7); transition: transform 0.25s, opacity 0.25s, background 0.25s; }
+#lives i.lost { background: transparent; box-shadow: none; border: 1px solid rgba(255,255,255,0.22); transform: scaleX(0.6); opacity: 0.6; }
+#lives.last i:not(.lost) { background: var(--ai); box-shadow: 0 0 12px var(--ai); animation: pulse 0.9s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+#damage { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, rgba(255,60,40,0) 40%, rgba(255,60,40,0.55) 100%); opacity: 0; }
+#damage.flash { animation: dmg 0.55s ease-out; }
+@keyframes dmg { 0% { opacity: 1; } 100% { opacity: 0; } }
+#shield { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 90px rgba(111,182,255,0.55); opacity: 0; transition: opacity 0.15s; }
+#shield.on { opacity: 1; animation: shield 0.3s linear infinite; }
+@keyframes shield { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 #shells { display: flex; gap: 6px; }
 #shells i { width: 12px; height: 26px; border-radius: 3px; background: var(--you); opacity: 0.95; box-shadow: 0 0 8px var(--you); }
 #shells i.spent { background: transparent; box-shadow: none; border: 1px solid rgba(255,255,255,0.25); }
