@@ -8,11 +8,16 @@
   - 机甲之间有碰撞体积（含队友），AI 走位预演把别的机甲当障碍。
   - 默认中文（文案为 Gemini 3.8 Flash 重写版，术语见「接手」#4）；Codex 生图素材 + 按概念图重建的机甲；
     Kenney 采样音效 + 两首 Suno 曲，菜单曲开站即尝试渐入；击杀播报；attract 菜单。
-- **cursor**：`docs/ROADMAP.md` → M3 已 ship；下一步 = 观赏性方向 2（击杀慢镜头），见 `TODO.md`。
-- ⚠ **今天下午之后的改动没有一项经真人玩过**（矮墙之后的全部）。真人验证清单在 `TODO.md` 第一节，
+  - **击杀慢镜头**：每次击杀 ¼ 速约 1.3 s（真实秒），导演模式（观战 / attract / 玩家死后）镜头甩向残骸 + 击杀者；
+    黑边 + 字幕；音效变调、音乐低通。主循环两套时钟 `dt` / `sdt`（GOTCHAS #18）。
+- **cursor**：`docs/ROADMAP.md` → M3 已 ship；观赏性 2（击杀慢镜头）已 ship；下一步 = 观赏性 3（地形美术），见 `TODO.md`。
+- ⚠ **今天下午之后的改动没有一项经真人玩过**（矮墙之后的全部，含击杀慢镜头）。真人验证清单在 `TODO.md` 第一节，
   先让用户玩，再决定改什么。
 - 远端 = GitHub `Quarkgluonmixture/ricochet-mech-arena`（public），Pages 接 Actions，只有动了代码才部署
   （`docs/**`、`**.md` 被 paths-ignore）。
+- **第二个线上地址** <https://quarkspace.top/ricochet-mech-arena>：是 `dist/` 的一份**拷贝**，放在
+  `../ai-model-observatory/public/ricochet-mech-arena/`（EdgeOne Pages 随该仓 `main` 发布，`next.config.ts` 里 307 到
+  `index.html`，先例 `/deepseek`）。⛔ 它不跟本仓自动更新：改完代码要 `npm run build` → 重拷 → 到那边 commit + push。
 
 ## 接手
 
@@ -28,9 +33,10 @@
 - **无头验证**：本仓不装 playwright，借 `../evofootball-arena/node_modules/playwright`（chromium 已装）。
   起 `npx vite --port <空闲端口> --strictPort --host 127.0.0.1`，先 `curl | grep "<title>Ricochet"` 确认端口上是本项目。
   页面上 `window.rma`：`drive(秒, {fire, move, torsoYaw, dash})` 不要 pointer lock 就推进模拟；`probe()` 拿位置/
-  分数/存活数/人机 safe 数/draw calls；`spectate(on)` / `attract(on)` / `roster(1|2|3)`；`hud.setOverlay(false)`
-  隐藏菜单；`mechs` / `slots`（每台机的 view/brain/marker/trail）。脚本形状：goto → waitForFunction(probe().drawCalls>0)
-  → drive → waitForTimeout → screenshot。
+  分数/存活数/人机 safe 数/draw calls/`timeScale`/`killcam`/`camera`；`spectate(on)` / `attract(on)` / `roster(1|2|3)`；
+  `hud.setOverlay(false)` 隐藏菜单；`mechs` / `slots`（每台机的 view/brain/marker/trail）；`slowmo`。脚本形状：goto →
+  waitForFunction(probe().drawCalls>0) → drive → waitForTimeout → screenshot。制造确定的击杀：PvE 下 `player.hp=1`，
+  `drive(0.05,{fire:true,torsoYaw:0})` 朝出生点东侧的墙开火，7 步后被自己的跳弹击毁（GOTCHAS #1 的反用）。
 - **推送**：仓库本地 credential helper 钉死个人号 ⇒ 直接 `git push`。⛔ 不要 `gh auth switch`。
   部署验证看线上 `index-*.js` 哈希是否等于本地 `dist/assets`，⛔ 别按 run 标题判断（标题会撞词）。
 - **素材**：改 `assets-src/PROMPTS.md` → `codex exec --sandbox workspace-write < assets-src/PROMPTS.md`
@@ -40,7 +46,7 @@
   `public/audio/sfx/`；文件名表在 `src/ui/audio.ts` 的 `SFX`。
 - **音乐**：`public/audio/menu.mp3`、`bgm.mp3`；战斗曲 start/loopStart 偏移在 `src/main.ts` 的 `MUSIC`。
 - Node ≥ 22.6 直跑 TS：`erasableSyntaxOnly`，⛔ 构造器参数属性（`constructor(private x)`）不能用。
-- 测试：`npm test`（vitest，只碰 `src/sim/`，20 条）。改 AI 打分或几何后必跑；改渲染后必截图。
+- 测试：`npm test`（vitest，`src/sim/` + 纯函数的 `src/ui/slowmo.ts`，26 条）。改 AI 打分或几何后必跑；改渲染后必截图。
 
 ## 文档地图
 

@@ -164,3 +164,19 @@
   中文文案为 Gemini 3.8 Flash 重写版；菜单音乐开站尝试渐入；命条右上。今天下午之后的改动仍无真人验证。
 - 坑 +1（#16）：`buildRoster` 会整体换掉 `world` / `player` 对象，任何缓存下来的引用都会指向旧世界。
 - 下一步不变：等真人反馈 → 观赏性 2（击杀慢镜头）。
+
+## [2026-09-13 23:24] 观赏性 2：击杀慢镜头 + 导演镜头聚焦  #ship #decision #measure
+- 做法：`src/ui/slowmo.ts` 纯函数包络（0.25×，attack 0.06 / hold 0.85 / release 0.4 真实秒，二次触发从当前速度续接不回弹）；
+  主循环两套时钟 `dt`（屏幕）/ `sdt`（世界）；`SpectatorCamera.focus()` 甩镜头（lerp 7/10 vs 常态 3/4，D≈6 m、高 4.1 m，
+  看点 62% 偏受害者）；音频 hum 变速 + 世界一次性音效变调 + 音乐低通 20 kHz→~900 Hz；HUD 黑边 7vh + 字幕（attract 不出黑边）；
+  弹尾改按 0.2 m 距离采样，否则慢放里彗尾缩成 1/4。killcam 存 mech id 不存对象（GOTCHAS #16）；round 事件和 buildRoster 都清。
+- 决策：慢放对所有击杀生效（含 3v3 中途击杀、attract 后台），镜头甩只在导演模式，驾驶舱里只拉长时间保留操控；非致命受击不慢放。
+- 决策（截图逼出来的）：**光走屏幕时间、物质走世界时间**——命中爆闪球按世界时间在慢放里成了 1.8 s 半透明圆顶罩住残骸，
+  改成 `fx.update(dt, sdt)`：爆闪 / 光环 / 池灯用 dt，碎片用 sdt。⇒ GOTCHAS #18。
+- 测量（无头 Chromium，swiftshader，帧约 0.4 s、dt 夹 0.1）：观战 3v3 自然击杀 timeScale 轨迹 1.00 → 0.25 × 9 帧 → 0.35 / 0.60 /
+  0.86 → 1.00，`#killcam` className `bars on`、`--k` 0.871、字幕「击杀镜头 · ¼ 速」；PvE 自杀跳弹后 相机到残骸距离 32.6 → 6.0 m、
+  高 4.1 m，focusing 全程 1，包络结束回到 D=48 的全场框。无头帧慢使包络在墙钟上拉长 3–4×，属族 B，不代表真机。
+- 坑：无头 0.3 s 截图没黑边，className 却已是 `on` —— CSS transition 合成落后，0.9 s 才 opacity 1。⇒ GOTCHAS #17。
+- 测试 +5（`tests/slowmo.test.ts`：卡在 <1 不回来、hold 时长、上下界、二次触发续接）；CLAUDE.md 的「测试只碰 sim」放宽为
+  「sim + 不碰 DOM/three 的纯函数模块」。26 条全过，tsc 干净。
+- 下一步：真人验证（TODO 第一节，含慢镜头 5 问）→ 观赏性 3 地形美术。
