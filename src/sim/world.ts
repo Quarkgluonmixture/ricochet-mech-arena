@@ -120,8 +120,10 @@ export class World {
       if (pointSegmentDist(m.pos, s.prev, s.pos) > m.radius + CFG.shell.radius) continue;
       m.alive = false;
       m.deaths++;
+      // the round goes to the shooter, or on an own goal to whoever is still standing
       const shooter = this.mechs[s.owner];
-      if (shooter && shooter.id !== m.id) shooter.kills++;
+      const winner = shooter && shooter.id !== m.id ? shooter : this.mechs.find((o) => o.id !== m.id && o.alive);
+      if (winner) winner.kills++;
       s.alive = false;
       this.events.push({ kind: 'hit', pos: { ...m.pos }, shooter: s.owner, victim: m.id, bounces: s.bounces, shell: s.id, vel: { ...s.vel } });
       if (this.roundDecidedAt < 0) {

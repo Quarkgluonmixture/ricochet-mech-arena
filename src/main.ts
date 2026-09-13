@@ -168,8 +168,10 @@ function handleEvents(): void {
         audio.hit(e.pos);
         fx.hit(e.pos.x, e.pos.z, e.victim === player.id ? COLORS.you : COLORS.ai);
         if (spectating) {
-          const how = e.shooter === e.victim ? 'Own ricochet.' : e.bounces > 0 ? `Bank shot from ${bearingWord(e.vel)}.` : 'Direct hit.';
-          hud.say(e.victim === player.id ? 'RED SCORES' : 'BLUE SCORES', e.victim === player.id ? 'ai' : 'you', how);
+          const own = e.shooter === e.victim;
+          const how = own ? 'Its own ricochet came back.' : e.bounces > 0 ? `Bank shot from ${bearingWord(e.vel)}.` : 'Direct hit.';
+          const victimBlue = e.victim === player.id;
+          hud.say(own ? `${victimBlue ? 'BLUE' : 'RED'} OWN GOAL` : victimBlue ? 'RED SCORES' : 'BLUE SCORES', victimBlue ? 'ai' : 'you', how);
         } else if (e.victim === player.id) {
           if (e.shooter === player.id) hud.say('OWN GOAL', 'ai', 'Your own ricochet came back.');
           else hud.say('HIT', 'ai', e.bounces > 0 ? `Bank shot from ${bearingWord(e.vel)}.` : 'Direct hit. Keep moving.');

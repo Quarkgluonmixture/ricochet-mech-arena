@@ -37,6 +37,7 @@ Open `?spectate` in the URL to start in spectator mode.
 - Shells fly at 16 m/s, bounce **once** off walls, die on the second wall or after 5 s. They hit anyone,
   including the shooter after the first bounce or 0.15 s. One hit kills. **The first hit decides the
   round**: survivors are invulnerable until the reset 2 s later (a trade in the same step is a draw).
+  The score counts rounds won: your kills, plus rounds the other side handed over with an own goal.
 - A shell leaves 1.13 m ahead of the mech, or just short of a wall if one is closer, so it can never be
   born inside a wall. Firing point-blank into a wall is an own goal.
 - The AI has exactly your movement model (`stepMotion` in `src/sim/mech.ts` is the only one), 2 shells

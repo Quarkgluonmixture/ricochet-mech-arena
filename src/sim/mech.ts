@@ -28,6 +28,7 @@ export interface Mech {
   fireCooldown: number;
   maxShells: number;
   shellsOut: number;
+  /** Rounds won: kills, plus rounds the opponent handed over with an own goal. */
   kills: number;
   deaths: number;
   /** Last commanded move, for animation and for the AI's smoothness term. */
