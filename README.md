@@ -51,8 +51,13 @@ Open `?spectate` in the URL to start in spectator mode.
 - HUD: score, shell pips, dash bar, threat markers around the crosshair for shells outside your view or
   predicted to reach you, a banner that names how each kill happened, and an "AI safe moves N/17" line so
   you can watch it get cornered.
-- No external assets: mechs are primitives, sounds are synthesised (fire, bounce, hit, dash, and a
-  per-shell hum positioned by bearing and distance).
+- Sound is synthesised (fire, bounce, hit, dash, and a per-shell hum positioned by bearing and distance).
+- Art: six generated images (floor, wall side, wall top, mech hull, hangar sky, key art) made with the
+  Codex image tool from the prompts in `assets-src/PROMPTS.md`; originals in `assets-src/`, the JPEGs the
+  game loads in `public/textures/` (`scripts/convert-assets.sh`). Textures tile at fixed metric sizes
+  via per-face UV scaling, so a 4 m wall and a 40 m wall show the same panel size. A bloom pass picks up
+  only the HDR emissives: shells, wall-edge light frames, visors, muzzle rings, head markers. Delete
+  `public/textures/` and the game still runs on flat colours.
 
 ## Spectator mode
 
@@ -86,11 +91,21 @@ of sight exists but no shell-width shot does. It never reads your inputs.
   in 20 s and a kill at 1.6 s. The AI is deliberately less of a turret now.
 - AI vs AI, 90 s: 106 and 105 shots, 3 rounds, both sides trapped (0 safe moves) at some point.
 
+## Regenerating art
+
+Edit the prompt in `assets-src/PROMPTS.md`, then:
+
+```
+codex exec --sandbox workspace-write < assets-src/PROMPTS.md   # ~1 min per image
+./scripts/convert-assets.sh                                     # PNG originals → public/textures/*.jpg
+```
+
 ## Layout
 
 - `src/sim/` — the game: `geom` (planar rays, boxes, circle resolution), `arena`, `shell`, `mech`,
   `world` (the step function and events), `ai`. No rendering imports. Tested on node.
-- `src/render/` — three.js scene, procedural mech, shell trails, FX, camera rig with a view-model gun.
+- `src/render/` — three.js scene with bloom post chain, texture loader, procedural mech, shell trails,
+  FX, camera rig with a view-model gun, spectator camera.
 - `src/ui/` — HUD, radar, threat ring, WebAudio synth.
 - `src/main.ts` — input, fixed-step loop (120 Hz), event → feedback, `window.rma` probe for headless runs.
 - `tests/` — vitest, sim only.

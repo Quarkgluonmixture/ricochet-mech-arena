@@ -14,7 +14,7 @@ export class GroundTrail {
     const cols = new Float32Array(N * 3);
     const c = new THREE.Color(color);
     for (let i = 0; i < N; i++) {
-      const f = (1 - i / N) ** 1.5;
+      const f = (1 - i / N) ** 1.5 * 1.5;
       cols[i * 3] = c.r * f; cols[i * 3 + 1] = c.g * f; cols[i * 3 + 2] = c.b * f;
     }
     const geo = new THREE.BufferGeometry();

@@ -91,11 +91,18 @@ player these compensations, and they are part of the product, not polish:
 
 ## §6 Assets
 
-Version one needs **no external assets**. Mechs are built from primitives, shells are emissive spheres, and
-every sound is synthesised in WebAudio. This is deliberate: readability beats fidelity for a dodge game,
-and a primitives-only build ships on Pages with zero pipeline. If assets arrive later, the ask is a
-low-poly mech glTF with **separate legs and torso nodes** and a handful of short sounds (fire, bounce, hit,
-dash). Nothing in the sim may depend on them.
+Version one shipped with **no external assets** (primitives, synthesised sound) so readability came first
+and the build had zero pipeline. On 2026-09-13 the user asked for a visual pass using generated images
+(GPT Image via the Codex image tool). The rules that survive that change:
+
+- **Art is render-only.** Nothing in `src/sim/` knows a texture exists; a missing image leaves the flat
+  colour in place. The game must remain fully playable with `public/textures/` deleted.
+- **Regenerable, not precious.** Every image comes from a prompt kept in `assets-src/PROMPTS.md`, and the
+  originals live in `assets-src/`. Re-rolling an asset is a prompt edit, not an art task.
+- **Tileable, textless, matte.** Textures tile at a fixed metric size (walls 2.25 m, floor 4 m) so they
+  never stretch with wall length; no text or logos anywhere; matte so the bloom pass only catches the
+  things that are meant to glow (shells, strips, visors, markers).
+- Still out of scope: 3D models. If a mech glTF ever arrives it needs separate legs and torso nodes.
 
 ## §7 Non-goals for now
 

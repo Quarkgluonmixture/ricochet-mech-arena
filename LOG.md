@@ -46,3 +46,14 @@
   修：打分用 `shellWalls`；无解超过 0.8 s 进入「找角度」状态（站立扣分 + 向目标逼近）；有解且无威胁时
   「停下来打」加分。90 s 从 1+1 发变成 106+105 发、3 回合。
 - 顺手修：站立时腿转向炮塔不能反过来带动炮塔（否则原地互追打转）；FX 点光源封顶 8 个。
+
+## 2026-09-13 — 视觉提升（Codex 生图）
+
+- 用户要整体视觉提升并指定用 Codex 调 GPT Image。探针：`codex exec` + `image_generation`（stable 已开）
+  一张 1024² 约 60 s，工具报模型名 gpt-image 2.0（用户说的 2.5 不可选）。六张素材一次 session 生成
+  （地板/舱壁/墙顶/装甲/机库天幕/封面），prompt 存 `assets-src/PROMPTS.md`，原图入库、JPEG 进 `public/`。
+- 代码侧：EffectComposer + UnrealBloomPass + OutputPass（MSAA 4x HalfFloat 目标）；贴图按固定米数平铺
+  （按 BoxGeometry 逐面缩放 UV）；等距柱状天幕兼环境光；自发光体走 HDR 倍率。
+- 第一版 bloom 炸白（强度 0.55 / 阈值 1.0 + 太阳 2.2）：炮弹成光球、枪口和墙顶全白。收到 0.32 / 1.35，
+  太阳 1.3。顺带发现墙顶「亮蓝」的真正原因是灯带薄板盖满墙顶（坑 #9）。
+- VISION §6 改写：素材允许但只进渲染层、可重生成、无文字、哑光。

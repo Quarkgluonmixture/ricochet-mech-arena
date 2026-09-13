@@ -8,6 +8,7 @@ import { CameraRig } from './render/camera.ts';
 import { Fx } from './render/fx.ts';
 import { HeadMarker } from './render/marker.ts';
 import { MechView } from './render/mech.ts';
+import { TEX } from './render/assets.ts';
 import { COLORS, createScene } from './render/scene.ts';
 import { ShellViews } from './render/shells.ts';
 import { SpectatorCamera } from './render/spectator.ts';
@@ -28,7 +29,7 @@ const blueState: AiState = makeAiState(player.torsoYaw);
 
 // ---- render + ui ----------------------------------------------------------------------------
 const view = document.getElementById('view') as HTMLElement;
-const { renderer, scene, camera } = createScene(view, arena);
+const { renderer, scene, camera, render } = createScene(view, arena);
 const playerView = new MechView(scene, COLORS.you);
 const enemyView = new MechView(scene, COLORS.ai);
 const shellViews = new ShellViews(scene, (owner) => (owner === player.id ? COLORS.you : COLORS.ai));
@@ -44,6 +45,7 @@ const radar = new Radar(document.getElementById('radar') as HTMLCanvasElement, a
 const threat = new ThreatRing(document.getElementById('threat') as HTMLCanvasElement);
 const audio = new Audio();
 hud.setCamMode(rig.mode);
+hud.setKeyArt(TEX.keyart);
 
 // ---- input ----------------------------------------------------------------------------------
 const keys = new Set<string>();
@@ -230,7 +232,7 @@ function frame(now: number): void {
     threat.draw(world, player, enemy, rig.mode === 'first' ? hfov / 2 : Math.PI * 0.4);
   }
   hud.update(player, enemy, aiState.lastSafe, aiState.lastCandidates, dt, spectating ? { safe: blueState.lastSafe, total: blueState.lastCandidates } : undefined);
-  renderer.render(scene, camera);
+  render();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

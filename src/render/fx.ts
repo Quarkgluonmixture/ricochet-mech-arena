@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CFG } from '../sim/config.ts';
+import { hdr } from './assets.ts';
 
 interface Particle { obj: THREE.Object3D; life: number; ttl: number; vel?: THREE.Vector3; grow?: number; mat: THREE.Material & { opacity: number } }
 
@@ -17,7 +18,7 @@ export class Fx {
   constructor(scene: THREE.Scene) { this.scene = scene; }
 
   bounce(x: number, z: number, nx: number, nz: number, color: number): void {
-    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
+    const mat = new THREE.MeshBasicMaterial({ color: hdr(color, 2.2), transparent: true, opacity: 0.9, side: THREE.DoubleSide });
     const ring = new THREE.Mesh(this.ringGeo, mat);
     ring.position.set(x + nx * 0.03, CFG.shell.height, z + nz * 0.03);
     ring.lookAt(x + nx, CFG.shell.height, z + nz);
@@ -27,7 +28,7 @@ export class Fx {
   }
 
   hit(x: number, z: number, color: number): void {
-    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 });
+    const mat = new THREE.MeshBasicMaterial({ color: hdr(color, 2.0), transparent: true, opacity: 0.8 });
     const s = new THREE.Mesh(this.sphereGeo, mat);
     s.position.set(x, 1.1, z);
     s.scale.setScalar(0.3);

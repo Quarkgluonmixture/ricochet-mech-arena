@@ -11,6 +11,9 @@
 - **第二轮真人反馈（同日，线上版）**：墙面杂纹（阴影痤疮 + 灯带共面）；死后对面还能被补刀（改成首杀定胜负、
   幸存者无敌）；人机贴墙/离墙 1 m 开火穿墙（炮口在 1.13 m 前、已在墙内 ⇒ 出膛点钳到墙前 + 墙内子弹销毁兜底）；
   要求人机转身时上半身一起转（炮塔骑在腿上 + 7 rad/s 回正 + ±100° 射界）。
+- **视觉提升**（2026-09-13 晚）：六张 Codex 生图素材 + bloom 后处理 + 按墙长缩放 UV + 天幕 + 封面。
+  Codex 跑的是 gpt-6-astra，生图工具报的模型名是 gpt-image 2.0，一张约 60 s。截图确认四个视角都对。
+  **改后还没有真人看过。**
 - **观战模式**（用户要「看两个机器人互相走位」）：T / 起始页按钮 / `?spectate`；蓝方用同一个大脑；导演镜头 +
   俯视；双方各 4 发、0.5 s 射速。做它时抓出两个人机死锁（坑 #7、#8）。**改后还没有真人再玩过**。
 - 远端 = GitHub `Quarkgluonmixture/ricochet-mech-arena`（public），Pages 接 Actions，
@@ -30,6 +33,8 @@
   `window.rma.probe()` 拿位置/击杀/人机 safe 数/解/draw calls；`window.rma.hud.setOverlay(false)` 隐藏起始遮罩；
   `window.rma.rig.toggle()` 切第三人称。截图脚本的形状：goto → waitForFunction(probe().drawCalls>0) → drive → screenshot。
 - 推送：仓库本地 credential helper 钉死个人号 ⇒ 直接 `git push`。⛔ 不要 `gh auth switch`。
+- 素材重生成：改 `assets-src/PROMPTS.md` → `codex exec --sandbox workspace-write < assets-src/PROMPTS.md`
+  （`image_generation` 是 Codex stable feature，已开）→ `./scripts/convert-assets.sh`。
 - Node ≥ 22.6 直跑 TS：`erasableSyntaxOnly`，⛔ 构造器参数属性（`constructor(private x)`）不能用。
 
 ## 坑
@@ -48,5 +53,10 @@
 7. 人机炮塔被腿「带着转」只能在**移动时**生效：站立时腿会转向炮塔，若此时也带动炮塔，两者会互相追着原地转。
 8. 快进模拟（`rma.drive` 一帧推几十秒）会在一帧里制造上百个命中/反弹事件，每个事件一个 PointLight 就把
    渲染拖死（截图 30 s 超时）。FX 灯光已封顶 8 个；快进后先 `waitForTimeout` 再截图。
-9. 无头 Chromium（swiftshader）截图偶发整页发白、HUD 半透明、左上角一个破图标 —— 同一状态再截一次就正常。
+9. 墙顶灯带曾是一块和墙顶同尺寸的发光薄板，把整个墙顶盖成亮蓝色，从第一版起所有截图里「墙顶太亮」都是它，
+   不是光照。现在是沿四边的细边框（合并成一个 mesh）。
+10. 未加载完成的贴图渲染成**黑色**而不是「无贴图」：`map` 一律在 load 回调里再赋值（`getTexture`），
+    缺文件时保留平色。bloom 阈值要高于被照亮表面的线性亮度（现在 1.35，太阳 1.3 + 天光 1.5），
+    否则阳光面整片发光；只让 HDR 自发光体（倍率 1.5–2.0）过阈值。
+11. 无头 Chromium（swiftshader）截图偶发整页发白、HUD 半透明、左上角一个破图标 —— 同一状态再截一次就正常。
    是合成器偶发不是产品问题；判定前先重截，⛔ 别按白图改渲染。

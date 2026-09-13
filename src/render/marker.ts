@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Mech } from '../sim/mech.ts';
+import { hdr } from './assets.ts';
 
 /** Always-on-top diamond above a mech's head, roughly constant screen size. Position only, never pose. */
 export class HeadMarker {
@@ -8,7 +9,7 @@ export class HeadMarker {
   private enabled = true;
 
   constructor(scene: THREE.Scene, color: number) {
-    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, depthTest: false, depthWrite: false });
+    const mat = new THREE.MeshBasicMaterial({ color: hdr(color, 1.8), transparent: true, opacity: 0.85, depthTest: false, depthWrite: false });
     this.mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), mat);
     this.mesh.renderOrder = 999;
     this.mesh.scale.set(0.7, 1.3, 0.7);

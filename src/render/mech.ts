@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CFG } from '../sim/config.ts';
 import type { Mech } from '../sim/mech.ts';
+import { TEX, getTexture, hdr } from './assets.ts';
 
 /** A mech built from primitives: legs group (faces the movement direction) + torso group (faces the aim). */
 export class MechView {
@@ -20,7 +21,11 @@ export class MechView {
     this.color = color;
     const body = new THREE.MeshStandardMaterial({ color: 0x8a93a6, roughness: 0.6, metalness: 0.35 });
     const accent = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.3 });
-    const glow = new THREE.MeshBasicMaterial({ color });
+    getTexture(TEX.hull, (t) => {
+      body.map = t; body.color.set(0xc9d0dc); body.needsUpdate = true;
+      accent.map = t; accent.needsUpdate = true; // tinted by the team colour
+    });
+    const glow = new THREE.MeshBasicMaterial({ color: hdr(color, 2.0) });
 
     const box = (w: number, h: number, d: number, m: THREE.Material) => {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
@@ -76,7 +81,7 @@ export class MechView {
     this.torso.add(chest, plate, head, visor, shoulderL, shoulderR, gun);
 
     // ground ring: bright when the dash is ready
-    this.ringMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7, side: THREE.DoubleSide });
+    this.ringMat = new THREE.MeshBasicMaterial({ color: hdr(color, 1.6), transparent: true, opacity: 0.7, side: THREE.DoubleSide });
     this.ring = new THREE.Mesh(new THREE.RingGeometry(0.72, 0.86, 40), this.ringMat);
     this.ring.rotation.x = -Math.PI / 2;
     this.ring.position.y = 0.02;

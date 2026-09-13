@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CFG } from '../sim/config.ts';
+import { TEX, getTexture, hdr } from './assets.ts';
 import { type Aabb, expandAll, forward, raycast } from '../sim/geom.ts';
 import type { Mech } from '../sim/mech.ts';
 
@@ -22,11 +23,12 @@ export class CameraRig {
     this.walls = expandAll(walls, 0.35);
     const body = new THREE.MeshStandardMaterial({ color: 0x8a93a6, roughness: 0.6, metalness: 0.35 });
     const accent = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.3 });
+    getTexture(TEX.hull, (t) => { body.map = t; body.color.set(0xc9d0dc); body.needsUpdate = true; accent.map = t; accent.needsUpdate = true; });
     const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, 0.7), body);
     this.vmBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.09, 1.0, 12), accent);
     this.vmBarrel.rotation.x = Math.PI / 2;
     this.vmBarrel.position.z = -0.75;
-    const muzzle = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.025, 8, 16), new THREE.MeshBasicMaterial({ color }));
+    const muzzle = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.025, 8, 16), new THREE.MeshBasicMaterial({ color: hdr(color, 1.5) }));
     muzzle.position.z = -1.24;
     this.viewmodel.add(receiver, this.vmBarrel, muzzle);
     this.viewmodel.position.set(0.42, -0.34, -0.55);

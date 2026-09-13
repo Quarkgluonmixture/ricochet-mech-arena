@@ -32,6 +32,8 @@ export class Hud {
   }
 
   setOverlay(visible: boolean): void { this.overlay.classList.toggle('hidden', !visible); }
+  /** Key art behind the start card. A relative URL so it works in dev and under the Pages sub-path. */
+  setKeyArt(url: string): void { this.overlay.style.backgroundImage = `linear-gradient(rgba(6,8,12,0.45), rgba(6,8,12,0.8)), url('${url}')`; }
   setSpectate(on: boolean): void { this.hud.classList.toggle('spectate', on); }
   setCamMode(mode: string): void { this.camMode.textContent = mode === 'first' ? '1st · V' : '3rd · V'; }
 

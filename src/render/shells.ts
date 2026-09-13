@@ -50,13 +50,13 @@ export class ShellViews {
 
   private create(s: Shell): View {
     const color = this.colorOf(s.owner);
-    const mesh = new THREE.Mesh(this.sphere, new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    const mesh = new THREE.Mesh(this.sphere, new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 1.6, 1.6) }));
     const light = new THREE.PointLight(color, 6, 9, 1.6);
     const pts = new Float32Array(TRAIL * 3);
     const cols = new Float32Array(TRAIL * 3);
     const c = new THREE.Color(color);
     for (let i = 0; i < TRAIL; i++) {
-      const f = 1 - i / TRAIL;
+      const f = (1 - i / TRAIL) * 1.8; // > 1 near the head so the trail blooms too
       cols[i * 3] = c.r * f; cols[i * 3 + 1] = c.g * f; cols[i * 3 + 2] = c.b * f;
       pts[i * 3] = s.pos.x; pts[i * 3 + 1] = CFG.shell.height; pts[i * 3 + 2] = s.pos.z;
     }
