@@ -1,0 +1,31 @@
+{
+  "name": "ricochet-mech-arena",
+  "private": true,
+  "version": "0.1.0",
+  "description": "First-person mech duel with ricocheting shells and an AI that dodges perfectly within the same movement limits you have. Beat it with geometry, not aim.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "@types/three": "^0.185.0",
+    "typescript": "^5.9.0",
+    "vite": "^6.2.0",
+    "vitest": "^3.0.5"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
+  }
+}
