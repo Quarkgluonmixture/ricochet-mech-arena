@@ -69,6 +69,12 @@ player these compensations, and they are part of the product, not polish:
 3. **Threat cues at the screen edge** for shells predicted to reach you soon.
 4. **Small, enclosed arenas** so ricochets mostly stay in view.
 5. **A third-person toggle** as a first-class option, not a debug view. Many players will prefer it.
+6. **Walls block shells, not sight** (added 2026-09-13 after the first human playtest: "in first person I
+   have no idea where it is"). Walls are 1.5 m, the eye is at 1.9 m, shells fly at 1.2 m. You see the
+   enemy's torso over the maze the way you saw everything top-down; the shell geometry is unchanged.
+   Plus an always-on-top marker over its head, and a bearing + distance cue when it is outside the view.
+7. **Enough shells to make it weave.** The dodge only reads as footwork under pressure. The player gets
+   8 shells in flight; the AI's fire rate is the difficulty knob that stays gentle.
 
 ## §6 Assets
 
