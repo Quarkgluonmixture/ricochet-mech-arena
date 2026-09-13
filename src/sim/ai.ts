@@ -51,11 +51,13 @@ function leadPoint(from: Vec2, target: Mech, speed: number): Vec2 {
  * Rejects solutions whose return leg passes through the shooter (VISION §4: no reading the future
  * beyond what a player could compute — this is plain geometry).
  */
-export function findFireSolution(self: Mech, target: Mech, shellWalls: Aabb[], speed: number = CFG.shell.speed, preferYaw?: number): FireSolution | null {
+export function findFireSolution(self: Mech, target: Mech, shellWalls: Aabb[], speed: number = CFG.shell.speed, preferYaw?: number, mates: Mech[] = []): FireSolution | null {
   const origin = self.pos;
   const aim = leadPoint(origin, target, speed);
   const straight = sub(aim, origin);
   if (len(straight) < 1e-3) return null;
+  // never through a teammate: friendly fire is on, so a leg that passes a mate is not a solution
+  const clearOfMates = (a: Vec2, b: Vec2) => mates.every((mate) => pointSegmentDist(mate.pos, a, b) > mate.radius + CFG.shell.radius + 0.25);
   // Cost = path length + a turning penalty, so a bank shot the torso is already lined up on beats a
   // marginally shorter one that needs a 90° slew (which would never fire against a moving target).
   const cost = (sol: FireSolution) => sol.length + (preferYaw === undefined ? 0 : Math.abs(angleDiff(preferYaw, yawOf(sol.dir))) * 8);
@@ -63,7 +65,7 @@ export function findFireSolution(self: Mech, target: Mech, shellWalls: Aabb[], s
   // direct. Rays start at the mech CENTRE, never at the nominal muzzle: the muzzle can lie inside a wall
   // when the mech is within ~1.1 m of it, and a ray born inside a box does not see that box.
   const dirDirect = norm(straight);
-  if (segmentClear(origin, aim, shellWalls)) return { dir: dirDirect, via: null, length: len(straight) };
+  if (segmentClear(origin, aim, shellWalls) && clearOfMates(origin, aim)) return { dir: dirDirect, via: null, length: len(straight) };
 
   let best: FireSolution | null = null;
   let bestCost = Infinity;
@@ -97,6 +99,7 @@ export function findFireSolution(self: Mech, target: Mech, shellWalls: Aabb[], s
       const back = add(hit, scale(f.axis === 'x' ? { x: f.side, z: 0 } : { x: 0, z: f.side }, 1e-3));
       if (!segmentClear(back, aim, shellWalls)) continue;
       if (pointSegmentDist(origin, back, aim) < selfClear) continue;
+      if (!clearOfMates(origin, hit) || !clearOfMates(back, aim)) continue;
       const length = dist(origin, hit) + dist(hit, aim);
       const sol = { dir, via: hit, length };
       const c = cost(sol);
@@ -108,6 +111,18 @@ export function findFireSolution(self: Mech, target: Mech, shellWalls: Aabb[], s
 
 interface Candidate { move: Vec2; dash: boolean }
 
+/** Which enemy to fight: the nearest one, with a strong preference for one there is a line of fire to. */
+export function pickTarget(world: World, self: Mech): Mech | null {
+  let best: Mech | null = null;
+  let bestScore = Infinity;
+  for (const e of world.enemiesOf(self)) {
+    const d = dist(self.pos, e.pos);
+    const score = d + (segmentClear(self.pos, e.pos, world.shellWalls) ? 0 : 10);
+    if (score < bestScore) { bestScore = score; best = e; }
+  }
+  return best;
+}
+
 /**
  * The dodge search. Every candidate is simulated with the real movement model against every live
  * shell's predicted path over the horizon. Safe candidates are scored by range band, line of sight,
@@ -115,6 +130,7 @@ interface Candidate { move: Vec2; dash: boolean }
  */
 export function planMove(world: World, self: Mech, target: Mech, st: AiState, wantsToShoot = false): { move: Vec2; dash: boolean; safe: number; total: number } {
   const A = CFG.ai;
+  const mates = world.matesOf(self);
   const dt = A.predictDt;
   const steps = Math.ceil(A.horizon / dt);
   const hitR = self.radius + CFG.shell.radius + A.dodgeMargin;
@@ -160,6 +176,8 @@ export function planMove(world: World, self: Mech, target: Mech, st: AiState, wa
       if (wantsToShoot && paths.length === 0 && len(c.move) < 0.01) score += 1.5;
       // no shot for a while: standing still is the one thing that cannot fix that
       if (hunting) { if (len(c.move) < 0.01) score -= 1.5; score -= d * 0.15; }
+      // spread out: a mech standing on a teammate blocks its shots and shares every ricochet
+      for (const mate of mates) { const md = dist(m.pos, mate.pos); if (md < 3) score -= (3 - md) * 0.8; }
       score -= contacts * 0.05;
       score -= len(sub(c.move, st.move)) * 0.4;
       if (c.dash) score -= 3; // dashes are precious; spend them only when nothing else is safe
@@ -204,7 +222,7 @@ export function aiThink(world: World, self: Mech, target: Mech, st: AiState, dt:
     st.dash = plan.dash;
     st.lastSafe = plan.safe;
     st.lastCandidates = plan.total;
-    st.solution = live ? findFireSolution(self, target, world.shellWalls, CFG.shell.speed, st.torsoYaw) : null;
+    st.solution = live ? findFireSolution(self, target, world.shellWalls, CFG.shell.speed, st.torsoYaw, world.matesOf(self)) : null;
     st.noSolutionT = st.solution ? 0 : st.noSolutionT + CFG.ai.replanInterval;
   }
   // Torso model (AI only; the player's mouse is free):

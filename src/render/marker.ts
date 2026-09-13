@@ -17,6 +17,7 @@ export class HeadMarker {
   }
 
   setVisible(v: boolean): void { this.enabled = v; }
+  dispose(): void { this.mesh.parent?.remove(this.mesh); }
 
   update(m: Mech, camera: THREE.Camera, dt: number): void {
     this.mesh.visible = m.alive && this.enabled;

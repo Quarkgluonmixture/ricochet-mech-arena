@@ -10,10 +10,13 @@ export interface MechInput {
   fire: boolean;
 }
 
+export type Team = 'blue' | 'red';
+
 export interface Mech {
   id: number;
   name: string;
   isPlayer: boolean;
+  team: Team;
   pos: Vec2;
   vel: Vec2;
   torsoYaw: number;
@@ -40,9 +43,9 @@ export interface Mech {
   moveIntent: Vec2;
 }
 
-export function makeMech(id: number, name: string, isPlayer: boolean, pos: Vec2, yaw = 0): Mech {
+export function makeMech(id: number, name: string, isPlayer: boolean, pos: Vec2, yaw = 0, team: Team = isPlayer ? 'blue' : 'red'): Mech {
   return {
-    id, name, isPlayer,
+    id, name, isPlayer, team,
     pos: { ...pos }, vel: { x: 0, z: 0 },
     torsoYaw: yaw, legsYaw: yaw,
     alive: true, hp: isPlayer ? CFG.player.lives : 1, hpMax: isPlayer ? CFG.player.lives : 1, invulnT: 0, radius: CFG.mech.radius,

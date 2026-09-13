@@ -30,6 +30,15 @@ npm run build    # tsc + vite → dist/
 
 Open `?spectate` in the URL to start in spectator mode.
 
+## Team battle
+
+Settings → Match: 1v1 duel, 2v2, or 3v3 (default). Your team is blue; you are blue 1, your teammates and all
+of red run the same brain. Friendly fire is on and earns nothing. A round ends when a whole team is down;
+the other team scores. When you die before your team, you watch the rest of the round through the
+director camera. The AI picks the nearest enemy it has a line of fire to, never shoots through a teammate
+(it banks around them instead), and spreads out from its mates. A kill feed at the top left names every
+kill and how it landed. Spawns: `P`/`B` blue, `E`/`R` red in the arena map.
+
 ## Rules (M0)
 
 - One arena (`MAP_A` in `src/sim/arena.ts`), 180°-rotation symmetric, 4 m corridors, **1.5 m walls**:

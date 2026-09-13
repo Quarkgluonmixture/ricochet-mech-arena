@@ -1,8 +1,8 @@
-import { type AiState, aiThink, makeAiState } from './sim/ai.ts';
+import { type AiState, aiThink, makeAiState, pickTarget } from './sim/ai.ts';
 import { MAP_A, buildArena } from './sim/arena.ts';
 import { CFG } from './sim/config.ts';
 import { type Vec2, forward, norm, right } from './sim/geom.ts';
-import type { MechInput } from './sim/mech.ts';
+import type { Mech, MechInput, Team } from './sim/mech.ts';
 import { World } from './sim/world.ts';
 import { TEX } from './render/assets.ts';
 import { CameraRig } from './render/camera.ts';
@@ -23,28 +23,13 @@ import { ThreatRing } from './ui/threat.ts';
 
 declare const __BUILD__: string;
 
-// ---- world ----------------------------------------------------------------------------------
-const arena = buildArena(MAP_A);
-const world = new World(arena);
-const player = world.addMech('you', true, arena.spawns.player, arena.spawnYaw.player);
-const enemy = world.addMech('AI', false, arena.spawns.enemy, arena.spawnYaw.enemy);
-const aiState: AiState = makeAiState(enemy.torsoYaw);
-/** Brain for the blue mech while spectating or in attract mode (AI vs AI). Same code as red. */
-const blueState: AiState = makeAiState(player.torsoYaw);
-
-// ---- render + ui ----------------------------------------------------------------------------
+// ---- settings, scene ------------------------------------------------------------------------
 const settings = loadSettings();
 setLang(settings.lang);
+const arena = buildArena(MAP_A);
 const view = document.getElementById('view') as HTMLElement;
 const { renderer, scene, camera, render, setQuality, update: updateScene } = createScene(view, arena, settings.quality);
-const playerView = new MechView(scene, COLORS.you);
-const enemyView = new MechView(scene, COLORS.ai);
-const shellViews = new ShellViews(scene, (owner) => (owner === player.id ? COLORS.you : COLORS.ai), QUALITY[settings.quality].shellLights);
 const fx = new Fx(scene);
-const enemyMarker = new HeadMarker(scene, COLORS.ai);
-const playerMarker = new HeadMarker(scene, COLORS.you);
-const enemyTrail = new GroundTrail(scene, COLORS.ai);
-const playerTrail = new GroundTrail(scene, COLORS.you);
 const rig = new CameraRig(camera, scene, arena.walls, COLORS.you);
 const spec = new SpectatorCamera(camera);
 const hud = new Hud();
@@ -57,10 +42,37 @@ hud.setSplash(TEX.keyart);
 hud.setBuild(__BUILD__);
 hud.setMusicStatus(t('music.none'));
 hud.menuHoverSync();
+const teamColor = (team: Team) => (team === 'blue' ? COLORS.you : COLORS.ai);
+
+// ---- roster: N mechs per team, rebuilt when the match size changes ----------------------------
+interface Slot { mech: Mech; view: MechView; state: AiState; marker: HeadMarker; trail: GroundTrail }
+let world = new World(arena);
+let slots: Slot[] = [];
+let player: Mech = world.addMech('you', true, arena.spawns.player, arena.spawnYaw.player, 'blue');
+let shellViews = new ShellViews(scene, () => COLORS.you, QUALITY[settings.quality].shellLights);
+
+function buildRoster(n: number): void {
+  for (const s of slots) { s.view.dispose(); s.marker.dispose(); s.trail.dispose(); }
+  slots = [];
+  world = new World(arena);
+  for (let i = 0; i < n; i++) world.addMech(i === 0 ? 'you' : `blue${i + 1}`, i === 0, arena.spawns.blue[i], arena.spawnYaw.blue[i], 'blue');
+  for (let i = 0; i < n; i++) world.addMech(`red${i + 1}`, false, arena.spawns.red[i], arena.spawnYaw.red[i], 'red');
+  for (const m of world.mechs) {
+    slots.push({ mech: m, view: new MechView(scene, teamColor(m.team)), state: makeAiState(m.torsoYaw), marker: new HeadMarker(scene, teamColor(m.team)), trail: new GroundTrail(scene, teamColor(m.team)) });
+  }
+  player = world.mechs[0];
+  yaw = player.torsoYaw;
+  shellViews.sync([]);
+  shellViews = new ShellViews(scene, (owner) => teamColor(world.mechs[owner]?.team ?? 'red'), QUALITY[settings.quality].shellLights);
+  hud.clearFeed();
+  applyLives();
+}
+
+/** Index within its team, for names like BLUE 2 / RED 3. */
+const teamIndex = (m: Mech) => world.mechs.filter((o) => o.team === m.team && o.id < m.id).length + 1;
+const nameOf = (m: Mech) => (m.isPlayer && !aiVsAi() ? t('name.you') : t(m.team === 'blue' ? 'name.blue' : 'name.red', { n: teamIndex(m) }));
 
 // ---- modes ----------------------------------------------------------------------------------
-/** Tracks the user made in Suno. The fight track has a cold open, then an intro from 17 s and the fight
- *  from 33 s: play the intro once, loop the fight. */
 const MUSIC = {
   menu: { url: 'audio/menu.mp3', start: 0, loopStart: 0 },
   game: { url: 'audio/bgm.mp3', start: 17, loopStart: 33 },
@@ -71,26 +83,37 @@ let spectating = false;
 let attract = false;
 let gameStarted = false;
 let dragging = false;
-let yaw = player.torsoYaw;
+let yaw = 0;
 let firePressed = false;
 let fireHeld = false;
 let dashPressed = false;
+let roundAnnounced = false;
 const keys = new Set<string>();
 const SENS = 0.0022; // × settings.sensitivity
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
+
+/** Both teams on the AI brain (spectator and attract). */
+const aiVsAi = () => spectating || attract;
 
 function applyDuck(): void {
   const paused = hud.overlayVisible;
   audio.setDuck(attract ? 0.1 : paused ? 0 : 1, paused && !attract ? 0.35 : 1);
 }
 
-/** Both mechs on the AI brain fight on one life each; the human gets CFG.player.lives. */
+/** The human takes CFG.player.lives; every AI-driven mech, the human's included, fights on one. */
 function applyLives(): void {
   player.hpMax = aiVsAi() ? 1 : CFG.player.lives;
   if (!player.alive) return;
-  // handing the blue mech back to the human mid-round: full lives, not the one it had as an AI
   player.hp = aiVsAi() ? 1 : world.roundOver ? Math.min(player.hp, player.hpMax) : player.hpMax;
+}
+
+function applyRosterLimits(): void {
+  for (const m of world.mechs) {
+    const human = m.isPlayer && !aiVsAi();
+    m.maxShells = human ? CFG.player.maxShells : aiVsAi() ? CFG.spectate.maxShells : CFG.ai.maxShells;
+    m.fireCooldown = human ? CFG.player.fireCooldown : aiVsAi() ? CFG.spectate.fireCooldown : CFG.ai.fireCooldown;
+  }
 }
 
 function setAttract(on: boolean): void {
@@ -98,8 +121,9 @@ function setAttract(on: boolean): void {
   attract = on;
   hud.setAttract(on);
   spec.autoOrbit = on ? 0.05 : 0;
-  rig.setViewmodelVisible(!on); // the cockpit gun is parented to the camera; the director cam must not carry it
-  if (on) { spec.reset(); blueState.round = -1; aiState.round = -1; }
+  rig.setViewmodelVisible(!on);
+  if (on) { spec.reset(); for (const s of slots) s.state.round = -1; }
+  applyRosterLimits();
   applyLives();
   applyDuck();
 }
@@ -113,23 +137,20 @@ function setSpectate(on: boolean): void {
     if (document.pointerLockElement) document.exitPointerLock();
     hud.setOverlay(false);
     spec.reset();
-    blueState.round = -1;
-    for (const m of world.mechs) { m.maxShells = CFG.spectate.maxShells; m.fireCooldown = CFG.spectate.fireCooldown; }
+    for (const s of slots) s.state.round = -1;
     rig.setViewmodelVisible(false);
   } else {
-    player.maxShells = CFG.player.maxShells; player.fireCooldown = CFG.player.fireCooldown;
-    enemy.maxShells = CFG.ai.maxShells; enemy.fireCooldown = CFG.ai.fireCooldown;
     yaw = player.torsoYaw;
     rig.pitch = 0;
     hud.setOverlay(!locked, gameStarted);
     if (!gameStarted) setAttract(true);
   }
+  applyRosterLimits();
   applyLives();
   applyDuck();
 }
 
-/** Both mechs on the AI brain (spectator and attract). */
-const aiVsAi = () => spectating || attract;
+buildRoster(settings.matchSize);
 
 // ---- start screen: preload, settings, music -------------------------------------------------
 void audio.preload();
@@ -139,16 +160,36 @@ const loadingTick = setInterval(() => {
   if (audio.ready) { clearInterval(loadingTick); window.clearTimeout(splashTimer); window.setTimeout(() => hud.hideSplash(), 400); }
 }, 100);
 
+function refreshMenuText(): void {
+  hud.relabel();
+  hud.setOverlay(hud.overlayVisible, gameStarted);
+  hud.setMusicStatus(audio.currentTrack ? t('music.track', { name: audio.currentTrack.split('/').pop() ?? '' }) : t('music.none'));
+  const hint = document.querySelector('#watch .hint');
+  if (hint) hint.textContent = t(settings.matchSize > 1 ? 'menu.watch.hint.team' : 'menu.watch.hint');
+}
+
 const setLangSel = $<HTMLSelectElement>('set-lang');
 setLangSel.value = settings.lang;
 setLangSel.addEventListener('change', () => {
   settings.lang = setLangSel.value as typeof settings.lang;
   setLang(settings.lang);
-  hud.relabel();
-  hud.setOverlay(hud.overlayVisible, gameStarted);
-  hud.setMusicStatus(audio.currentTrack ? t('music.track', { name: audio.currentTrack.split('/').pop() ?? '' }) : t('music.none'));
+  refreshMenuText();
   audio.ui('switch');
   saveSettings(settings);
+});
+const setMatch = $<HTMLSelectElement>('set-match');
+setMatch.value = String(settings.matchSize);
+setMatch.addEventListener('change', () => {
+  settings.matchSize = Number(setMatch.value) as 1 | 2 | 3;
+  saveSettings(settings);
+  audio.ui('switch');
+  // a new roster is a new match
+  if (spectating) setSpectate(false);
+  gameStarted = false;
+  buildRoster(settings.matchSize);
+  for (const s of slots) s.state.round = -1;
+  setAttract(true);
+  refreshMenuText();
 });
 const setQ = $<HTMLSelectElement>('set-quality');
 const setSfx = $<HTMLInputElement>('set-sfx');
@@ -177,18 +218,17 @@ setFps.addEventListener('change', () => { settings.showFps = setFps.checked; aud
 $('settings-btn').addEventListener('click', () => { audio.unlock(); audio.ui('click'); hud.showSettings(true); });
 $('settings-close').addEventListener('click', () => { audio.ui('back'); hud.showSettings(false); });
 applySettings();
+refreshMenuText();
 
 let musicPhase: 'none' | 'menu' | 'game' = 'none';
 async function music(phase: 'menu' | 'game'): Promise<void> {
   if (musicPhase === phase) return;
   musicPhase = phase;
   const track = phase === 'game' ? MUSIC.game : MUSIC.menu;
-  const ok = await audio.playTrack(track.url, 2, { start: track.start, loopStart: track.loopStart });
-  if (!ok && phase === 'game') { /* no game track: keep whatever is playing (menu track or silence) */ }
+  await audio.playTrack(track.url, 2, { start: track.start, loopStart: track.loopStart });
   const cur = audio.currentTrack;
   hud.setMusicStatus(cur ? t('music.track', { name: cur.split('/').pop() ?? '' }) : t('music.none'));
 }
-// the first gesture anywhere unlocks audio and starts the menu track (browsers block earlier starts)
 const firstGesture = () => { audio.unlock(); if (musicPhase === 'none') void music('menu'); };
 document.addEventListener('pointerdown', firstGesture, { once: true });
 document.addEventListener('keydown', firstGesture, { once: true });
@@ -198,7 +238,6 @@ document.addEventListener('keydown', (e) => {
   if (e.code === 'Space') e.preventDefault();
   if (e.repeat) return;
   keys.add(e.code);
-  // menu keyboard navigation
   if (hud.overlayVisible && !locked && !spectating) {
     if (e.code === 'ArrowDown' || e.code === 'KeyS') { hud.menuMove(1); audio.ui('click'); return; }
     if (e.code === 'ArrowUp' || e.code === 'KeyW') { hud.menuMove(-1); audio.ui('click'); return; }
@@ -244,7 +283,7 @@ const play = () => {
   audio.ui('confirm');
   void music('game');
   setAttract(false);
-  if (!gameStarted) { world.resetMatch(); yaw = player.torsoYaw; rig.pitch = 0; gameStarted = true; }
+  if (!gameStarted) { world.resetMatch(); yaw = player.torsoYaw; rig.pitch = 0; gameStarted = true; hud.clearFeed(); }
   renderer.domElement.requestPointerLock();
 };
 $('play').addEventListener('click', play);
@@ -279,26 +318,31 @@ const stats = { fires: [0, 0], bounces: 0, hits: 0, selfHits: 0 };
 
 function handleEvents(): void {
   for (const e of world.events) {
-    if (e.kind === 'fire') stats.fires[e.mech]++;
+    if (e.kind === 'fire') stats.fires[world.mechs[e.mech]?.team === 'blue' ? 0 : 1]++;
     else if (e.kind === 'bounce') stats.bounces++;
     else if (e.kind === 'hit') { stats.hits++; if (e.shooter === e.victim) stats.selfHits++; }
     switch (e.kind) {
-      case 'fire':
-        audio.fire(e.pos, e.mech === player.id);
-        if (e.mech === player.id) { rig.kick(); playerView.kick(); } else enemyView.kick();
+      case 'fire': {
+        const m = world.mechs[e.mech];
+        audio.fire(e.pos, m.id === player.id && !aiVsAi());
+        if (m.id === player.id && !aiVsAi()) rig.kick();
+        slots[m.id]?.view.kick();
         break;
+      }
       case 'bounce':
         audio.bounce(e.pos);
-        fx.bounce(e.pos.x, e.pos.z, e.nx, e.nz, e.owner === player.id ? COLORS.you : COLORS.ai);
+        fx.bounce(e.pos.x, e.pos.z, e.nx, e.nz, teamColor(world.mechs[e.owner]?.team ?? 'red'));
         break;
       case 'dash':
         audio.dash(e.pos);
         break;
       case 'hit': {
+        const victim = world.mechs[e.victim];
+        const shooter = world.mechs[e.shooter];
+        const isMe = victim.id === player.id && !aiVsAi();
         if (!e.fatal) {
-          // a life lost: the round goes on
-          fx.bounce(e.pos.x, e.pos.z, -e.vel.x, -e.vel.z, e.victim === player.id ? COLORS.you : COLORS.ai);
-          if (e.victim === player.id && !aiVsAi()) {
+          fx.bounce(e.pos.x, e.pos.z, -e.vel.x, -e.vel.z, teamColor(victim.team));
+          if (isMe) {
             hud.flashDamage();
             rig.hurt();
             audio.damage(e.hpLeft === 1);
@@ -309,26 +353,30 @@ function handleEvents(): void {
           break;
         }
         audio.hit(e.pos);
-        fx.hit(e.pos.x, e.pos.z, e.victim === player.id ? COLORS.you : COLORS.ai);
+        fx.hit(e.pos.x, e.pos.z, teamColor(victim.team));
         if (attract) break;
-        if (spectating) {
-          const own = e.shooter === e.victim;
-          const how = own ? t('h.itsOwnRicochetBack') : e.bounces > 0 ? t('h.bankFrom', { dir: bearingWord(e.vel) }) : t('h.direct');
-          const victimBlue = e.victim === player.id;
-          hud.say(t(own ? (victimBlue ? 'b.blueOwnGoal' : 'b.redOwnGoal') : victimBlue ? 'b.redScores' : 'b.blueScores'), victimBlue ? 'ai' : 'you', how);
-        } else if (e.victim === player.id) {
-          if (e.shooter === player.id) hud.say(t('b.ownGoal'), 'ai', t('h.ownRicochet'));
-          else hud.say(t('b.hit'), 'ai', e.bounces > 0 ? t('h.bankFrom', { dir: bearingWord(e.vel) }) : t('h.directKeepMoving'));
-        } else if (e.shooter === player.id) {
-          hud.say(t('b.kill'), 'you', e.bounces > 0 ? t('h.bankNeverSaw') : t('h.cornered'));
-        } else hud.say(t('b.itShotItself'), 'you', t('h.itsOwnRicochet'));
+        const own = shooter.id === victim.id;
+        const friendly = !own && shooter.team === victim.team;
+        const howKey = own ? 'feed.own' : friendly ? 'feed.friendly' : e.bounces > 0 ? 'feed.bank' : 'feed.direct';
+        hud.feed(`<span class="${victim.team}">${nameOf(victim)}</span> <span class="dim">←</span> <span class="${shooter.team}">${nameOf(shooter)}</span> <span class="dim">· ${t(howKey)}</span>`);
+        const decided = world.roundOver && !roundAnnounced;
+        if (decided) roundAnnounced = true;
+        const winner: Team | null = decided ? (world.alive('blue').length > 0 ? 'blue' : world.alive('red').length > 0 ? 'red' : null) : null;
+        const howLong = own ? (isMe ? t('h.ownRicochet') : t('h.itsOwnRicochet')) : e.bounces > 0 ? t('h.bankFrom', { dir: bearingWord(e.vel) }) : isMe ? t('h.directKeepMoving') : t('h.direct');
+        if (aiVsAi()) {
+          if (winner) hud.say(t(winner === 'blue' ? 'b.blueRound' : 'b.redRound'), winner === 'blue' ? 'you' : 'ai', howLong);
+          break;
+        }
+        if (isMe) hud.say(t(own ? 'b.ownGoal' : 'b.hit'), 'ai', howLong, decided ? 3 : 2.2);
+        else if (shooter.id === player.id && victim.team !== player.team) hud.say(t('b.kill'), 'you', e.bounces > 0 ? t('h.bankNeverSaw') : t('h.cornered'));
+        else if (winner) hud.say(t(winner === player.team ? 'b.roundWon' : 'b.roundLost'), winner === player.team ? 'you' : 'ai', t(winner === player.team ? 'h.teamWiped' : 'h.yourTeamWiped'));
         break;
       }
       case 'round':
+        roundAnnounced = false;
         yaw = player.torsoYaw;
         rig.pitch = 0;
-        enemyTrail.reset();
-        playerTrail.reset();
+        for (const s of slots) s.trail.reset();
         if (!attract) audio.round();
         break;
       default:
@@ -345,9 +393,35 @@ let frameMs = 16;
 let fpsTimer = 0;
 
 function simStep(input: MechInput | null): void {
-  const blue = aiVsAi() ? aiThink(world, player, enemy, blueState, STEP) : input;
-  world.step(STEP, [blue, aiThink(world, enemy, player, aiState, STEP)]);
+  const inputs = world.mechs.map((m) => {
+    if (m.isPlayer && !aiVsAi()) return input;
+    const target = pickTarget(world, m) ?? world.mechs.find((o) => o.team !== m.team) ?? m;
+    return aiThink(world, m, target, slots[m.id].state, STEP);
+  });
+  world.step(STEP, inputs);
   handleEvents();
+}
+
+function nearestEnemy(): Mech | null {
+  let best: Mech | null = null, bd = Infinity;
+  for (const m of world.enemiesOf(player)) { const d = Math.hypot(m.pos.x - player.pos.x, m.pos.z - player.pos.z); if (d < bd) { bd = d; best = m; } }
+  return best;
+}
+
+function readout(): string {
+  const fmt = (team: Team) => {
+    const ais = world.mechs.filter((m) => m.team === team && m.alive && !(m.isPlayer && !aiVsAi()));
+    if (ais.length === 0) return t('hud.safeDash');
+    let min = Infinity, total = 0;
+    for (const m of ais) { const s = slots[m.id].state; if (s.lastCandidates > 0) { min = Math.min(min, s.lastSafe); total = s.lastCandidates; } }
+    if (total === 0) return t('hud.safeDash');
+    return `${min}/${total}${min === 0 ? t('hud.safeTrapped') : ''}`;
+  };
+  if (aiVsAi()) return t('hud.teamSafe', { b: fmt('blue'), r: fmt('red') });
+  if (settings.matchSize > 1) return '';
+  const e = world.mechs.find((m) => m.team !== player.team);
+  const s = e ? slots[e.id].state : null;
+  return e && e.alive && s && s.lastCandidates > 0 ? t('hud.aiSafe', { n: s.lastSafe, total: s.lastCandidates }) + (s.lastSafe === 0 ? t('hud.trapped') : '') : '';
 }
 
 function frame(now: number): void {
@@ -361,30 +435,32 @@ function frame(now: number): void {
     acc += dt;
     while (acc >= STEP) { simStep(aiVsAi() ? null : playerInput()); acc -= STEP; }
   }
-  playerView.update(player, dt);
-  enemyView.update(enemy, dt);
-  playerView.root.visible = player.alive && (rig.mode === 'third' || aiVsAi());
+  const humanFpv = !aiVsAi() && player.alive && rig.mode === 'first';
+  for (const s of slots) {
+    s.view.update(s.mech, dt);
+    if (s.mech.id === player.id) s.view.root.visible = player.alive && !humanFpv;
+    s.marker.update(s.mech, camera, dt);
+    s.marker.setVisible(!attract && s.mech.id !== player.id && (s.mech.team !== player.team || settings.matchSize > 1 || spectating));
+    s.trail.update(s.mech, dt);
+  }
   shellViews.sync(world.shells);
   fx.update(dt);
   updateScene(dt);
-  if (aiVsAi()) spec.update(player, enemy, dt); else rig.update(player, dt);
-  enemyMarker.update(enemy, camera, dt);
-  playerMarker.update(player, camera, dt);
-  playerMarker.setVisible(spectating);
-  enemyMarker.setVisible(!attract);
-  enemyTrail.update(enemy, dt);
-  playerTrail.update(player, dt);
-  if (aiVsAi()) audio.setListener({ x: camera.position.x, z: camera.position.z }, spec.yaw());
+  // dead humans watch the rest of the round through the director camera
+  const directorCam = aiVsAi() || !player.alive;
+  rig.setViewmodelVisible(!directorCam && rig.mode === 'first');
+  if (directorCam) spec.update(world.mechs, dt); else rig.update(player, dt);
+  if (directorCam) audio.setListener({ x: camera.position.x, z: camera.position.z }, spec.yaw());
   else audio.setListener(player.pos, player.torsoYaw);
   audio.syncHums(world.shells, player.id);
   hud.setShield(!aiVsAi() && player.alive && player.invulnT > 0);
   if (!aiVsAi()) {
     hud.setLives(player.hp, player.hpMax);
-    radar.draw(world, player, enemy);
+    radar.draw(world, player);
     const hfov = 2 * Math.atan(Math.tan((camera.fov * Math.PI) / 360) * camera.aspect);
-    threat.draw(world, player, enemy, rig.mode === 'first' ? hfov / 2 : Math.PI * 0.4);
+    threat.draw(world, player, nearestEnemy(), rig.mode === 'first' ? hfov / 2 : Math.PI * 0.4);
   }
-  hud.update(player, enemy, aiState.lastSafe, aiState.lastCandidates, dt, spectating ? { safe: blueState.lastSafe, total: blueState.lastCandidates } : undefined);
+  hud.update(player, world.score, readout(), dt);
   render();
   requestAnimationFrame(frame);
 }
@@ -395,9 +471,13 @@ if (new URLSearchParams(location.search).has('spectate')) setSpectate(true);
 // ---- headless probe (screenshots, tests in a real browser) ----------------------------------
 declare global { interface Window { rma: unknown } }
 window.rma = {
-  world, player, enemy, aiState, blueState, CFG, rig, spec, hud, stats, audio, MUSIC,
+  get world() { return world; }, get player() { return player; }, get enemy() { return world.mechs.find((m) => m.team !== player.team)!; },
+  get mechs() { return world.mechs; }, get slots() { return slots; },
+  get aiState() { return slots[world.mechs.find((m) => m.team !== player.team)!.id].state; }, get blueState() { return slots[player.id].state; },
+  CFG, rig, spec, hud, stats, audio, MUSIC, settings,
   spectate(on: boolean): void { setSpectate(on); },
   attract(on: boolean): void { setAttract(on); },
+  roster(n: 1 | 2 | 3): void { settings.matchSize = n; buildRoster(n); },
   /** Run the sim for `seconds` with a scripted player input, without pointer lock. */
   drive(seconds: number, input: Partial<MechInput> = {}): void {
     const n = Math.round(seconds / STEP);
@@ -407,12 +487,14 @@ window.rma = {
     }
   },
   probe() {
+    const enemy = world.mechs.find((m) => m.team !== player.team)!;
     return {
-      time: world.time, round: world.round, shells: world.shells.length, locked, spectating, attract, gameStarted,
+      time: world.time, round: world.round, shells: world.shells.length, locked, spectating, attract, gameStarted, roster: world.mechs.length, score: { ...world.score },
       mode: spectating ? `spectate:${spec.mode}` : attract ? 'attract' : rig.mode,
-      player: { pos: player.pos, alive: player.alive, kills: player.kills, deaths: player.deaths },
+      player: { pos: player.pos, alive: player.alive, kills: player.kills, deaths: player.deaths, hp: player.hp },
       enemy: { pos: enemy.pos, alive: enemy.alive, kills: enemy.kills, deaths: enemy.deaths },
-      aiSafe: aiState.lastSafe, aiCandidates: aiState.lastCandidates, aiSolution: aiState.solution, stats: { ...stats, fires: [...stats.fires] },
+      alive: { blue: world.alive('blue').length, red: world.alive('red').length },
+      aiSafe: slots[enemy.id].state.lastSafe, aiCandidates: slots[enemy.id].state.lastCandidates, aiSolution: slots[enemy.id].state.solution, stats: { ...stats, fires: [...stats.fires] },
       drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, music: audio.currentTrack,
     };
   },

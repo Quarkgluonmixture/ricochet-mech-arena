@@ -41,6 +41,7 @@ export class Hud {
   private fps = $('fps');
   private splash = $('splash');
   private items = Array.from(document.querySelectorAll<HTMLButtonElement>('#menu-list .item'));
+  private feedEl = $('feed');
   private lives = $('lives');
   private lifePips: HTMLElement[] = [];
   private damage = $('damage');
@@ -113,20 +114,26 @@ export class Hud {
     this.bannerTimer = seconds;
   }
 
-  update(player: Mech, ai: Mech, aiSafe: number, aiTotal: number, dt: number, blue?: { safe: number; total: number }): void {
-    this.scoreYou.textContent = String(player.kills);
-    this.scoreAi.textContent = String(ai.kills);
+  /** One line of the kill feed; spans carry team classes. Old lines fade out by CSS and are pruned. */
+  feed(html: string): void {
+    const line = document.createElement('div');
+    line.innerHTML = html;
+    this.feedEl.appendChild(line);
+    while (this.feedEl.children.length > 4) this.feedEl.firstElementChild?.remove();
+    window.setTimeout(() => line.remove(), 4400);
+  }
+  clearFeed(): void { this.feedEl.replaceChildren(); }
+
+  update(player: Mech, score: { blue: number; red: number }, readout: string, dt: number): void {
+    this.scoreYou.textContent = String(score.blue);
+    this.scoreAi.textContent = String(score.red);
     const available = player.maxShells - player.shellsOut;
     this.pips.forEach((p, i) => p.classList.toggle('spent', i >= available));
     const ready = player.dashCd <= 0;
     const frac = ready ? 1 : 1 - player.dashCd / CFG.mech.dashCooldown;
     this.dashFill.style.transform = `scaleX(${frac.toFixed(3)})`;
     this.dash.classList.toggle('ready', ready);
-    const red = ai.alive && aiTotal > 0 ? `${aiSafe}/${aiTotal}${aiSafe === 0 ? t('hud.safeTrapped') : ''}` : t('hud.safeDash');
-    if (blue) {
-      const b = player.alive && blue.total > 0 ? `${blue.safe}/${blue.total}${blue.safe === 0 ? t('hud.safeTrapped') : ''}` : t('hud.safeDash');
-      this.aiDebug.textContent = t('hud.safeBoth', { b, r: red });
-    } else this.aiDebug.textContent = ai.alive && aiTotal > 0 ? t('hud.aiSafe', { n: aiSafe, total: aiTotal }) + (aiSafe === 0 ? t('hud.trapped') : '') : '';
+    this.aiDebug.textContent = readout;
     if (this.bannerTimer > 0) {
       this.bannerTimer -= dt;
       if (this.bannerTimer <= 0) { this.banner.className = ''; this.hint.className = ''; }

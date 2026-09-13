@@ -36,11 +36,22 @@ export class SpectatorCamera {
     return Math.atan2(-d.x, -d.z);
   }
 
-  update(a: Mech, b: Mech, dt: number): void {
+  update(mechs: Mech[], dt: number): void {
     this.thetaOffset += this.autoOrbit * dt;
-    const mx = (a.pos.x + b.pos.x) / 2, mz = (a.pos.z + b.pos.z) / 2;
+    const live = mechs.filter((m) => m.alive);
+    const pts = live.length > 0 ? live : mechs;
+    // centroid and the farthest-apart pair: the pair sets the side the camera stands on, the spread sets the distance
+    let mx = 0, mz = 0;
+    for (const m of pts) { mx += m.pos.x; mz += m.pos.z; }
+    mx /= pts.length; mz /= pts.length;
+    let a = pts[0], b = pts[pts.length - 1], best = -1;
+    for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
+      const d = Math.hypot(pts[i].pos.x - pts[j].pos.x, pts[i].pos.z - pts[j].pos.z);
+      if (d > best) { best = d; a = pts[i]; b = pts[j]; }
+    }
     const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z;
-    const sep = Math.hypot(dx, dz);
+    let sep = Math.max(0, best);
+    for (const m of pts) sep = Math.max(sep, 2 * Math.hypot(m.pos.x - mx, m.pos.z - mz));
     const target = new THREE.Vector3();
     const lookAt = new THREE.Vector3(mx, 1, mz);
     if (this.mode === 'top') {

@@ -4,7 +4,7 @@ Sole truth for stages. Other files point here; they do not copy this list.
 
 ## Current cursor
 
-**M0 — playable duel** (in progress, 2026-09-13).
+**M3 — teams** shipped 2026-09-13 (3v3 default). M0–M2 partially folded in along the way; see LOG.
 
 ## Stages
 
@@ -17,5 +17,5 @@ Sole truth for stages. Other files point here; they do not copy this list.
   bounce FX. Mobile-safe HUD scaling.
 - **M2 — arenas.** Several hand-made layouts, chosen by URL param. A layout must be checked for "no spot
   where the AI can be trapped from spawn" (spawn fairness).
-- **M3 — more mechs.** 1v2 or 2v2 (AI teammates and enemies share the same brain). Friendly fire on.
+- **M3 — more mechs.** ✅ 1v1 / 2v2 / 3v3, one brain for every AI, friendly fire on, wipe = round.
 - **M4 — assets (optional).** glTF mech skin with legs/torso nodes; recorded sounds. Sim untouched.

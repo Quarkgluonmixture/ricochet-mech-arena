@@ -20,7 +20,7 @@ export class ThreatRing {
     this.size = canvas.width;
   }
 
-  draw(world: World, player: Mech, enemy: Mech, fovHalfAngle: number): void {
+  draw(world: World, player: Mech, enemy: Mech | null, fovHalfAngle: number): void {
     const ctx = this.ctx;
     const S = this.size;
     const R = S * 0.36;
@@ -30,7 +30,7 @@ export class ThreatRing {
     const r = right(player.torsoYaw);
 
     // enemy bearing marker when it is outside the view: a diamond on an outer ring plus the distance
-    if (enemy.alive) {
+    if (enemy && enemy.alive) {
       const dx = enemy.pos.x - player.pos.x, dz = enemy.pos.z - player.pos.z;
       const d = Math.hypot(dx, dz);
       if (d > 1e-3) {
@@ -77,7 +77,7 @@ export class ThreatRing {
       const urgency = tti < 0 ? 0 : 1 - tti / HORIZON;
       const alpha = tti < 0 ? 0.28 : 0.45 + 0.55 * urgency;
       const size = tti < 0 ? 6 : 8 + 10 * urgency;
-      const col = s.owner === player.id ? '111, 182, 255' : '255, 106, 92';
+      const col = world.mechs[s.owner]?.team === player.team ? '111, 182, 255' : '255, 106, 92';
       const px = S / 2 + sx * R, py = S / 2 + sy * R;
       ctx.save();
       ctx.translate(px, py);

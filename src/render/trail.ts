@@ -26,6 +26,7 @@ export class GroundTrail {
   }
 
   reset(): void { this.filled = 0; }
+  dispose(): void { this.line.parent?.remove(this.line); this.line.geometry.dispose(); }
 
   update(m: Mech, dt: number): void {
     this.line.visible = m.alive && this.filled > 1;

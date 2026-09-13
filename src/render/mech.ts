@@ -156,6 +156,7 @@ export class MechView {
   }
 
   kick(): void { this.recoil = 1; }
+  dispose(): void { this.root.parent?.remove(this.root); }
 
   update(m: Mech, dt: number): void {
     this.root.visible = m.alive;

@@ -1,7 +1,7 @@
 import { CFG } from './config.ts';
 import { type Arena, buildArena } from './arena.ts';
 import { type Aabb, type Vec2, add, expandAll, forward, pointSegmentDist, raycast, scale } from './geom.ts';
-import { type Mech, type MechInput, makeMech, stepMech } from './mech.ts';
+import { type Mech, type MechInput, type Team, makeMech, stepMech } from './mech.ts';
 import { type BounceEvent, type Shell, advanceShell } from './shell.ts';
 
 export type WorldEvent =
@@ -34,6 +34,8 @@ export class World {
   roundDecidedAt = -1;
   round = 1;
   nextShellId = 1;
+  /** Rounds won per team. A round is won when the other team has no mech standing. */
+  score: Record<Team, number> = { blue: 0, red: 0 };
 
   constructor(arena: Arena = buildArena()) {
     this.arena = arena;
@@ -41,11 +43,15 @@ export class World {
     this.shellWalls = expandAll(arena.walls, CFG.shell.radius);
   }
 
-  addMech(name: string, isPlayer: boolean, pos: Vec2, yaw = 0): Mech {
-    const m = makeMech(this.mechs.length, name, isPlayer, pos, yaw);
+  addMech(name: string, isPlayer: boolean, pos: Vec2, yaw = 0, team?: Team): Mech {
+    const m = makeMech(this.mechs.length, name, isPlayer, pos, yaw, team);
     this.mechs.push(m);
     return m;
   }
+
+  alive(team: Team): Mech[] { return this.mechs.filter((m) => m.team === team && m.alive); }
+  enemiesOf(m: Mech): Mech[] { return this.mechs.filter((o) => o.team !== m.team && o.alive); }
+  matesOf(m: Mech): Mech[] { return this.mechs.filter((o) => o.team === m.team && o.id !== m.id && o.alive); }
 
   step(dt: number, inputs: (MechInput | null)[]): void {
     this.events.length = 0;
@@ -129,14 +135,19 @@ export class World {
       m.hp = 0;
       m.alive = false;
       m.deaths++;
-      // the round goes to the shooter, or on an own goal to whoever is still standing
       const shooter = this.mechs[s.owner];
-      const winner = shooter && shooter.id !== m.id ? shooter : this.mechs.find((o) => o.id !== m.id && o.alive);
-      if (winner) winner.kills++;
+      if (shooter && shooter.team !== m.team) shooter.kills++; // friendly fire and own goals earn nothing
       this.events.push({ kind: 'hit', pos: { ...m.pos }, shooter: s.owner, victim: m.id, bounces: s.bounces, shell: s.id, vel: { ...s.vel }, fatal: true, hpLeft: 0 });
-      if (this.roundDecidedAt < 0) {
+      // the round ends when a team has nobody standing; the other team takes it (nobody, on a same-step wipe of both)
+      if (this.alive(m.team).length === 0 && this.roundDecidedAt < 0) {
         this.roundDecidedAt = this.time;
         this.roundResetAt = this.time + CFG.round.respawnDelay;
+        const other: Team = m.team === 'blue' ? 'red' : 'blue';
+        if (this.alive(other).length > 0) this.score[other]++;
+      } else if (this.roundDecidedAt === this.time && this.alive(m.team).length === 0) {
+        // same-step trade: the other team was credited a moment ago; take it back, it is a draw
+        const other: Team = m.team === 'blue' ? 'red' : 'blue';
+        if (this.alive(other).length === 0) this.score[other] = Math.max(0, this.score[other] - 1);
       }
       return;
     }
@@ -145,6 +156,7 @@ export class World {
   /** New match: scores and round counter back to zero, then a fresh round. */
   resetMatch(): void {
     for (const m of this.mechs) { m.kills = 0; m.deaths = 0; }
+    this.score = { blue: 0, red: 0 };
     this.round = 0;
     this.time = 0;
     this.resetRound();
@@ -156,18 +168,18 @@ export class World {
     this.round++;
     for (const s of this.shells) s.alive = false;
     this.shells.length = 0;
-    const spawns = [this.arena.spawns.player, this.arena.spawns.enemy];
-    const yaws = [this.arena.spawnYaw.player, this.arena.spawnYaw.enemy];
-    this.mechs.forEach((m, i) => {
-      const sp = spawns[i % spawns.length];
-      m.pos = { ...sp };
+    const idx: Record<Team, number> = { blue: 0, red: 0 };
+    for (const m of this.mechs) {
+      const list = this.arena.spawns[m.team];
+      const yaws = this.arena.spawnYaw[m.team];
+      const k = idx[m.team]++ % list.length;
+      m.pos = { ...list[k] };
       m.vel = { x: 0, z: 0 };
       m.alive = true;
       m.hp = m.hpMax; m.invulnT = 0;
       m.dashT = 0; m.dashCd = 0; m.fireCd = 0; m.shellsOut = 0;
-      const yaw = yaws[i % yaws.length];
-      m.torsoYaw = yaw; m.legsYaw = yaw;
-    });
+      m.torsoYaw = yaws[k]; m.legsYaw = yaws[k];
+    }
     this.events.push({ kind: 'round', pos: { x: 0, z: 0 } });
   }
 }

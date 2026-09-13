@@ -50,6 +50,12 @@ html, body { margin: 0; height: 100%; background: #0b0e14; color: var(--ink); ov
 #hint.show { opacity: 0.95; }
 #ai-debug { position: absolute; right: 18px; top: 18px; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; text-align: right; line-height: 1.5; }
 #cam-mode { position: absolute; right: 18px; bottom: 18px; font-size: 12px; color: var(--dim); }
+#feed { position: absolute; left: 18px; top: 18px; display: flex; flex-direction: column; gap: 5px; font: 500 13px var(--ui); letter-spacing: 0.06em; }
+#feed div { padding: 4px 10px; background: rgba(8,11,17,0.55); border-left: 2px solid rgba(255,255,255,0.25); border-radius: 3px; animation: feedin 0.2s ease-out, feedout 0.6s ease-in 3.6s forwards; }
+#feed .blue { color: var(--you); } #feed .red { color: var(--ai); } #feed .dim { color: var(--dim); }
+@keyframes feedin { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+@keyframes feedout { to { opacity: 0; } }
+#hud.spectate #feed { top: 52px; }
 #spec-help { position: absolute; bottom: 22px; left: 0; right: 0; text-align: center; font-size: 13px; color: var(--dim); display: none; }
 #spec-help b { color: var(--ink); }
 #hud.spectate #crosshair, #hud.spectate #threat, #hud.spectate #radar, #hud.spectate #status, #hud.spectate #cam-mode { display: none; }

@@ -25,7 +25,7 @@ export class Radar {
     this.colors = colors;
   }
 
-  draw(world: World, player: Mech, ai: Mech): void {
+  draw(world: World, player: Mech): void {
     const ctx = this.ctx;
     const S = this.size;
     const R = S / 2;
@@ -47,7 +47,7 @@ export class Radar {
     ctx.lineWidth = 0.14;
     for (const s of world.shells) {
       if (!s.alive) continue;
-      const col = s.owner === player.id ? this.colors.you : this.colors.ai;
+      const col = world.mechs[s.owner]?.team === player.team ? this.colors.you : this.colors.ai;
       const path = predictPath(s, world.shellWalls, PATH_HORIZON, PATH_DT);
       ctx.strokeStyle = col;
       ctx.globalAlpha = 0.5;
@@ -79,19 +79,21 @@ export class Radar {
       ctx.stroke();
       ctx.globalAlpha = 1;
     };
-    tri(ai, this.colors.ai);
-    tri(player, this.colors.you);
-    // enemy beyond the radar's range: pin a diamond to the rim along its bearing
-    const dEnemy = Math.hypot(ai.pos.x - player.pos.x, ai.pos.z - player.pos.z);
     const rim = metresVisible / 2 - 1.2;
-    if (ai.alive && dEnemy > rim) {
-      const ux = (ai.pos.x - player.pos.x) / dEnemy, uz = (ai.pos.z - player.pos.z) / dEnemy;
+    for (const m of world.mechs) {
+      if (m.id === player.id || !m.alive) continue;
+      const col = m.team === player.team ? this.colors.you : this.colors.ai;
+      const d = Math.hypot(m.pos.x - player.pos.x, m.pos.z - player.pos.z);
+      if (d <= rim) { tri(m, col); continue; }
+      // beyond the radar's range: pin a diamond to the rim along its bearing
+      const ux = (m.pos.x - player.pos.x) / d, uz = (m.pos.z - player.pos.z) / d;
       const px = player.pos.x + ux * rim, pz = player.pos.z + uz * rim;
-      ctx.fillStyle = this.colors.ai;
+      ctx.fillStyle = col;
       ctx.beginPath();
       ctx.moveTo(px, pz - 1.1); ctx.lineTo(px + 0.8, pz); ctx.lineTo(px, pz + 1.1); ctx.lineTo(px - 0.8, pz); ctx.closePath();
       ctx.fill();
     }
+    tri(player, '#ffffff');
     ctx.restore();
 
     ctx.strokeStyle = 'rgba(255,255,255,0.18)';
