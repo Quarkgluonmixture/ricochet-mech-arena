@@ -90,3 +90,10 @@
   《Hangar Silence》（3:45，188 kbps），去掉内嵌封面后装为 `menu.mp3`。
 - `playTrack` 加 `start`（首遍起点）/`loopStart`（后续每遍起点）：战斗曲首遍 17 s → 末尾，之后 33 s → 末尾循环，
   末尾 2.5 s 与下一遍交叉淡入。第二首文件未到，`bgm.mp3` 缺失时静默、菜单曲继续。
+
+## 2026-09-13 — 第二首到位 + 弹墙音重做
+
+- 《Chrome Pulse》装为 `bgm.mp3`（3:17，-15.0 LUFS，菜单曲 -14.3）。
+- 用户：弹墙音「太脆，像敲玻璃杯」。用 ffmpeg `aspectralstats` 排全部候选样本的平均频谱质心：原来用的
+  `impactMetal_light` 是全包最亮（2006 Hz）而且代码里还升了音高。换 sci-fi 包 `impactMetal`（384 Hz）做主体 +
+  `impactMetal_heavy`（1078 Hz，0.17 s）做瞬态，音高 0.9 / 0.82，低通 2.6 k / 3.2 k，混响送 0.5。

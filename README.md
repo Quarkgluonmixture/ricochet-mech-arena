@@ -51,11 +51,12 @@ Open `?spectate` in the URL to start in spectator mode.
 - HUD: score, shell pips, dash bar, threat markers around the crosshair for shells outside your view or
   predicted to reach you, a banner that names how each kill happened, and an "AI safe moves N/17" line so
   you can watch it get cornered.
-- Sound: Kenney CC0 samples (fire, ricochet, explosion, dash, engine hum per live shell, UI) with a
+- Sound: Kenney CC0 samples (fire, ricochet = dark sci-fi metal thud plus a short heavy clank, both pitched
+  down and low-passed, explosion, dash, engine hum per live shell, UI) with a
   synthesised sub-thump under each shot, positioned by bearing and distance, sent through a shared reverb
   and summed into a compressor. Credits in `public/audio/sfx/CREDITS.txt`.
 - Music: two Suno tracks by the user. `public/audio/menu.mp3` ("Hangar Silence") loops on the start screen
-  from the first click or key. `public/audio/bgm.mp3` is the fight track: it has a cold open, an intro from
+  from the first click or key. `public/audio/bgm.mp3` ("Chrome Pulse") is the fight track: it has a cold open, an intro from
   17 s and the fight from 33 s, so Play or Watch starts it at 17 s once and then loops 33 s → end. Offsets
   live in `MUSIC` in `src/main.ts`. Loops crossfade the last 2.5 s of each pass into the next, so any
   exported song loops without a click or a gap. Music ducks while paused. No file, no music, no error.

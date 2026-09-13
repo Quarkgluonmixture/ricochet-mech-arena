@@ -10,6 +10,7 @@ import type { Vec2 } from '../sim/geom.ts';
 const SFX: Record<string, string[]> = {
   fire: ['fire_0', 'fire_1', 'fire_2', 'fire_3', 'fire_4'],
   bounce: ['bounce_0', 'bounce_1', 'bounce_2', 'bounce_3', 'bounce_4'],
+  clank: ['clank_0', 'clank_1', 'clank_2', 'clank_3', 'clank_4'],
   explode: ['explode_0', 'explode_1', 'explode_2', 'explode_3', 'explode_4'],
   boom: ['boom_0', 'boom_1'],
   dash: ['dash'],
@@ -149,7 +150,7 @@ export class Audio {
   }
 
   /** Play a sample at a world position: distance gain, stereo pan, pitch variation, reverb send. */
-  private sample(kind: string, pos: Vec2 | null, level: number, opts: { pitch?: number; pitchVar?: number; send?: number } = {}): void {
+  private sample(kind: string, pos: Vec2 | null, level: number, opts: { pitch?: number; pitchVar?: number; send?: number; lowpass?: number } = {}): void {
     if (!this.ctx) return;
     const buf = this.pick(kind);
     if (!buf) return;
@@ -163,7 +164,13 @@ export class Audio {
     g.gain.value = level * sp.gain;
     const p = ctx.createStereoPanner();
     p.pan.value = sp.pan;
-    src.connect(g).connect(p).connect(this.sfxBus);
+    if (opts.lowpass) {
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = opts.lowpass;
+      lp.Q.value = 0.7;
+      src.connect(lp).connect(g).connect(p).connect(this.sfxBus);
+    } else src.connect(g).connect(p).connect(this.sfxBus);
     if (opts.send !== 0 && pos) {
       const send = ctx.createGain();
       send.gain.value = (opts.send ?? 0.3) * sp.gain;
@@ -192,7 +199,13 @@ export class Audio {
     this.sample('fire', pos, own ? 0.55 : 0.5, { pitch: 0.85, pitchVar: 0.06, send: 0.25 });
     this.thump(pos, own ? 0.7 : 0.5);
   }
-  bounce(pos: Vec2): void { this.sample('bounce', pos, 0.7, { pitch: 1.1, pitchVar: 0.12, send: 0.45 }); }
+  /** Ricochet: a dark sci-fi metal thud (spectral centroid ~400 Hz) under a short heavy clank, both pitched
+   *  down and low-passed. The first version used the brightest sample in the pack pitched UP — "like tapping
+   *  a glass", said the playtest. */
+  bounce(pos: Vec2): void {
+    this.sample('bounce', pos, 0.8, { pitch: 0.9, pitchVar: 0.08, send: 0.5, lowpass: 2600 });
+    this.sample('clank', pos, 0.32, { pitch: 0.82, pitchVar: 0.1, send: 0.3, lowpass: 3200 });
+  }
   hit(pos: Vec2): void {
     this.sample('explode', pos, 1.0, { pitchVar: 0.06, send: 0.5 });
     this.sample('boom', pos, 0.9, { pitchVar: 0.05, send: 0.3 });
