@@ -56,7 +56,12 @@ hud.setBuild(`build ${__BUILD__}`);
 hud.menuHoverSync();
 
 // ---- modes ----------------------------------------------------------------------------------
-const MUSIC = { menu: 'audio/menu.mp3', game: 'audio/bgm.mp3' };
+/** Tracks the user made in Suno. The fight track has a cold open, then an intro from 17 s and the fight
+ *  from 33 s: play the intro once, loop the fight. */
+const MUSIC = {
+  menu: { url: 'audio/menu.mp3', start: 0, loopStart: 0 },
+  game: { url: 'audio/bgm.mp3', start: 17, loopStart: 33 },
+};
 let locked = false;
 let spectating = false;
 /** Attract mode: AI vs AI behind the menu, HUD hidden, effects muted. On until the first Play/Watch. */
@@ -153,8 +158,8 @@ let musicPhase: 'none' | 'menu' | 'game' = 'none';
 async function music(phase: 'menu' | 'game'): Promise<void> {
   if (musicPhase === phase) return;
   musicPhase = phase;
-  const url = phase === 'game' ? MUSIC.game : MUSIC.menu;
-  const ok = await audio.playTrack(url);
+  const t = phase === 'game' ? MUSIC.game : MUSIC.menu;
+  const ok = await audio.playTrack(t.url, 2, { start: t.start, loopStart: t.loopStart });
   if (!ok && phase === 'game') { /* no game track: keep whatever is playing (menu track or silence) */ }
   const cur = audio.currentTrack;
   hud.setMusicStatus(cur ? `music · ${cur.split('/').pop()}` : 'music · none');
@@ -350,7 +355,7 @@ if (new URLSearchParams(location.search).has('spectate')) setSpectate(true);
 // ---- headless probe (screenshots, tests in a real browser) ----------------------------------
 declare global { interface Window { rma: unknown } }
 window.rma = {
-  world, player, enemy, aiState, blueState, CFG, rig, spec, hud, stats,
+  world, player, enemy, aiState, blueState, CFG, rig, spec, hud, stats, audio, MUSIC,
   spectate(on: boolean): void { setSpectate(on); },
   attract(on: boolean): void { setAttract(on); },
   /** Run the sim for `seconds` with a scripted player input, without pointer lock. */

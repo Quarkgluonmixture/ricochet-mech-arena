@@ -54,10 +54,11 @@ Open `?spectate` in the URL to start in spectator mode.
 - Sound: Kenney CC0 samples (fire, ricochet, explosion, dash, engine hum per live shell, UI) with a
   synthesised sub-thump under each shot, positioned by bearing and distance, sent through a shared reverb
   and summed into a compressor. Credits in `public/audio/sfx/CREDITS.txt`.
-- Music: drop a track at `public/audio/bgm.mp3` (Suno or anything else) and optionally `menu.mp3` for the
-  start screen. Tracks loop by crossfading the last 2.5 s of one pass into the next, so any exported song
-  loops without a click or a gap. The menu track starts on the first click or key, the game track fades in
-  on Play or Watch, music ducks while paused. No file, no music, no error.
+- Music: two Suno tracks by the user. `public/audio/menu.mp3` ("Hangar Silence") loops on the start screen
+  from the first click or key. `public/audio/bgm.mp3` is the fight track: it has a cold open, an intro from
+  17 s and the fight from 33 s, so Play or Watch starts it at 17 s once and then loops 33 s → end. Offsets
+  live in `MUSIC` in `src/main.ts`. Loops crossfade the last 2.5 s of each pass into the next, so any
+  exported song loops without a click or a gap. Music ducks while paused. No file, no music, no error.
 - Art: six generated images (floor, wall side, wall top, mech hull, hangar sky, key art) made with the
   Codex image tool from the prompts in `assets-src/PROMPTS.md`; originals in `assets-src/`, the JPEGs the
   game loads in `public/textures/` (`scripts/convert-assets.sh`). Textures tile at fixed metric sizes

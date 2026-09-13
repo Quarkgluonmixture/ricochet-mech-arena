@@ -83,3 +83,10 @@
     metallic hits, tense arpeggios, cinematic sci-fi, instrumental, no vocals, steady energy, loopable, no fade out`
   - 菜单：`dark ambient sci-fi, slow sub-bass pulse, cavernous hangar reverb, soft synth pads, sparse metallic
     percussion, brooding, instrumental, no vocals, loopable, no build-ups`
+
+## 2026-09-13 — 接入 Suno 音乐
+
+- 用户给了两首：第一首从头当菜单曲；第二首 17–33 s 是 intro、33 s 起是战斗段。Downloads 里当时只有第一首
+  《Hangar Silence》（3:45，188 kbps），去掉内嵌封面后装为 `menu.mp3`。
+- `playTrack` 加 `start`（首遍起点）/`loopStart`（后续每遍起点）：战斗曲首遍 17 s → 末尾，之后 33 s → 末尾循环，
+  末尾 2.5 s 与下一遍交叉淡入。第二首文件未到，`bgm.mp3` 缺失时静默、菜单曲继续。

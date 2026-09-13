@@ -266,31 +266,37 @@ export class Audio {
    * Play a track as a seamless loop: each pass fades out over the last OVERLAP seconds while the next pass
    * fades in on top, so any exported song loops without a click or a gap. Crossfades from whatever is
    * playing. Returns false (and leaves the current track alone) when the file is missing.
+   *
+   * `start` = where the FIRST pass begins (e.g. skip a cold open), `loopStart` = where every later pass
+   * begins (e.g. after an intro): "17 s to 33 s is the intro, from 33 s it is the fight" → start 17, loopStart 33.
    */
-  async playTrack(url: string, fadeIn = 2): Promise<boolean> {
+  async playTrack(url: string, fadeIn = 2, opts: { start?: number; loopStart?: number } = {}): Promise<boolean> {
     const buf = await this.loadTrack(url);
     if (!buf) return false;
     if (this.music && this.music.url === url) return true;
     const ctx = this.ensure();
     this.stopTrack(1.5);
+    const startAt = Math.min(opts.start ?? 0, Math.max(0, buf.duration - 1));
+    const loopAt = Math.min(opts.loopStart ?? 0, Math.max(0, buf.duration - 1));
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0, ctx.currentTime);
     gain.gain.linearRampToValueAtTime(1, ctx.currentTime + fadeIn);
     gain.connect(this.musicBus);
     const entry = { url, gain, timer: 0, sources: [] as AudioBufferSourceNode[] };
     this.music = entry;
-    const OV = Math.min(Audio.OVERLAP, buf.duration / 3);
+    const OV = Math.min(Audio.OVERLAP, (buf.duration - loopAt) / 3);
     const pass = (at: number, first: boolean) => {
       const src = ctx.createBufferSource();
       src.buffer = buf;
       const g = ctx.createGain();
       if (first) g.gain.setValueAtTime(1, at);
       else { g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(1, at + OV); }
-      const end = at + buf.duration;
+      const offset = first ? startAt : loopAt;
+      const end = at + (buf.duration - offset);
       g.gain.setValueAtTime(1, end - OV);
       g.gain.linearRampToValueAtTime(0, end);
       src.connect(g).connect(gain);
-      src.start(at);
+      src.start(at, offset);
       src.stop(end + 0.05);
       entry.sources.push(src);
       src.onended = () => { entry.sources = entry.sources.filter((x) => x !== src); };
