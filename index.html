@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ricochet Mech Arena</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="view"></div>
+    <div id="hud">
+      <div id="crosshair"><i></i></div>
+      <canvas id="threat" width="420" height="420"></canvas>
+      <canvas id="radar" width="220" height="220"></canvas>
+      <div id="score"><span id="score-you">0</span><span class="vs">·</span><span id="score-ai">0</span></div>
+      <div id="status">
+        <div id="shells"></div>
+        <div id="dash"><i></i></div>
+      </div>
+      <div id="banner"></div>
+      <div id="hint"></div>
+      <div id="ai-debug"></div>
+      <div id="cam-mode">1st</div>
+    </div>
+    <div id="overlay">
+      <div class="card">
+        <h1>Ricochet Mech Arena</h1>
+        <p class="lede">Direct shots never land on it. It moves exactly as fast as you do, and no faster. Bounce shells off walls, corner it, make two shells meet. It will do the same to you.</p>
+        <ul>
+          <li><b>Mouse</b> aim &nbsp; <b>Click</b> fire &nbsp; <b>W A S D</b> move &nbsp; <b>Shift</b> / <b>Space</b> dash</li>
+          <li><b>V</b> first ↔ third person &nbsp; <b>R</b> reset round &nbsp; <b>Esc</b> release mouse</li>
+        </ul>
+        <button id="play">Click to play</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
