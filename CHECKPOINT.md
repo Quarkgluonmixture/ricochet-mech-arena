@@ -1,93 +1,44 @@
 # CHECKPOINT — ricochet-mech-arena
 
-## 现场（2026-09-13）
+## 现场（截至 2026-09-13 深夜）
 
-- cursor 在 `docs/ROADMAP.md` **M0**，代码已可玩：FPV 战甲、横移+冲刺、弹墙炮弹、完美闪避人机、
-  雷达、威胁提示、合成音效、第三人称切换、计分与回合重置。
-- M0 exit 的**测试半边**已过（人机躲直射 / 窄走廊必死 / 不超速 / 反弹解真能到）。
-- **第一次真人试玩（2026-09-13）反馈**：太难；第一人称不知道对面在哪；第三人称子弹太少看不出走位。
-  已改：墙 3 → 1.5 m（挡弹不挡视线，VISION §5.6）、敌机头顶常显标记、视野外方位+距离、雷达边缘钉标、
-  地面走位光带、玩家在飞弹 4 → 8、人机开火间隔 0.7 → 1.0 s。
-- **第二轮真人反馈（同日，线上版）**：墙面杂纹（阴影痤疮 + 灯带共面）；死后对面还能被补刀（改成首杀定胜负、
-  幸存者无敌）；人机贴墙/离墙 1 m 开火穿墙（炮口在 1.13 m 前、已在墙内 ⇒ 出膛点钳到墙前 + 墙内子弹销毁兜底）；
-  要求人机转身时上半身一起转（炮塔骑在腿上 + 7 rad/s 回正 + ±100° 射界）。
-- **3v3 团队战**（用户「先做 1」，默认 3v3，设置里可切 1v1/2v2）：地图 `P/B`=蓝、`E/R`=红各三个出生点；
-  每台 AI 各自一个 `AiState`；目标选择 = 最近且有射线的敌人；射击解不穿队友（绕反弹）；队友间距惩罚；
-  友军伤害开但不计分；一队全灭 = 回合结束、对方 `world.score` +1；玩家先死则切导演镜头看完；
-  左上角击杀播报；HUD 分数改为队伍回合胜场。**改后没真人看过。**
-- **中英文切换**（默认中文，用户要求）：`src/ui/i18n.ts` 一张表，静态文案用 `data-i18n` / `data-i18n-html` 绑定，
-  动态文案走 `t()`；设置面板加语言下拉；`body.zh` 调 CJK 字距。加新文案先进表，⛔ 别在 main/hud 里写死字符串。
-- **三条命**（用户要求）：人机对战里玩家 `hp` 3、人机 1（VISION §4c）；非致命命中扣一命 + 1.2 s 无敌 + 红闪/震屏/
-  受击音/蓝边光；只有致命命中才定胜负；观战/attract 里双方都 1 命。测试锁住扣命/无敌窗口/最后一命致死。
-- **美术第二轮**（用户「机器人形态和场景把美术变好一点」）：Codex 出机甲三视概念图 → 代码重建机甲（圆角装甲板、
-  外露髋膝关节、小腿液压杆、斜胸甲、肩甲队色条、面罩头、右臂炮带制退器和开火发亮的散热口、左臂盾、背包推进器
-  冲刺点亮、膝盖弯曲脚保持水平）；场景加地面延伸、外圈灯柱、冷暖轮廓光、呼吸灯带、漂浮尘埃、等离子光晕炮弹、暗角。
-  **改后没真人看过。**
-- **音乐**：菜单曲 `public/audio/menu.mp3`（《Hangar Silence》）、战斗曲 `public/audio/bgm.mp3`（《Chrome Pulse》，
-  17 s 起播一遍 intro、33 s 到结尾循环，偏移在 `src/main.ts` 的 `MUSIC`），都是用户 Suno 出的，已装。
-  弹墙音按用户反馈换成闷重金属（LOG 同日）。**换后没真人听过。**
-- **开始界面重做**（用户「有点廉价」）：不再是卡片贴海报——菜单后面跑 AI vs AI 的 attract 场景（导演镜头慢转、
-  HUD 隐藏、音效静音），左侧大标题 + 竖排菜单（Chakra Petch / Rajdhani 自托管 OFL 字体）、右侧滑出设置面板、
-  封面图只做加载 splash、键盘上下+Enter 可操作。BGM 改为交叉淡入的无缝循环，支持 `menu.mp3` + `bgm.mp3`，
-  暂停时音乐压低。Suno style prompt 在 LOG 同日条目。**改后还没有真人看过。**
-- **性能 / 音效 / 开始界面**（2026-09-13 深夜，用户反馈「有点卡、音效垃圾」）：画质三档（默认 Medium：像素比
-  1.25、2x MSAA、bloom、1024 阴影）；点光源改固定池（每发炮弹一个灯 ⇒ 灯数变化触发全部着色器重编译 ⇒ 每开一枪卡一下，
-  这是卡顿主因之一）；音效换 Kenney CC0 采样 + 混响 + 压缩器；开始界面 = 暂停菜单，含设置面板、加载条、帧时间；
-  BGM 位置 `public/audio/bgm.mp3`（用户去 Suno 生成）。**改后还没有真人试过。**
-- **视觉提升**（2026-09-13 晚）：六张 Codex 生图素材 + bloom 后处理 + 按墙长缩放 UV + 天幕 + 封面。
-  Codex 跑的是 gpt-6-astra，生图工具报的模型名是 gpt-image 2.0，一张约 60 s。截图确认四个视角都对。
-  **改后还没有真人看过。**
-- **观战模式**（用户要「看两个机器人互相走位」）：T / 起始页按钮 / `?spectate`；蓝方用同一个大脑；导演镜头 +
-  俯视；双方各 4 发、0.5 s 射速。做它时抓出两个人机死锁（坑 #7、#8）。**改后还没有真人再玩过**。
-- 远端 = GitHub `Quarkgluonmixture/ricochet-mech-arena`（public），Pages 接 Actions，
-  站点 <https://quarkgluonmixture.github.io/ricochet-mech-arena/>。只有动了代码才部署（docs/md 被 paths-ignore）。
+- **线上可玩**：<https://quarkgluonmixture.github.io/ricochet-mech-arena/>。默认 3v3 团队战（设置可切 1v1/2v2）、
+  默认中文、人 3 命 / AI 1 命、Codex 生图素材 + 按概念图重建的机甲、Kenney 采样音效 + 两首 Suno 曲、
+  attract 菜单、观战模式、击杀播报。规则与操作以 `README.md` 为准。
+- **cursor**：`docs/ROADMAP.md` → M3 已 ship；下一步 = 观赏性方向 2（击杀慢镜头），见 `TODO.md`。
+- ⚠ **今天下午之后的改动没有一项经真人玩过**（矮墙之后的全部）。真人验证清单在 `TODO.md` 第一节，
+  先让用户玩，再决定改什么。
+- 远端 = GitHub `Quarkgluonmixture/ricochet-mech-arena`（public），Pages 接 Actions，只有动了代码才部署
+  （`docs/**`、`**.md` 被 paths-ignore）。
 
 ## 接手
 
-1. 读 `docs/VISION.md`（短，全文）。
-2. `npm install && npm run dev`，点 Click to play，先感受 30 秒。
-3. 看 `README.md` 「Verified」那段的数字；要复现就跑 Ops 里的无头脚本。
+1. 扫 `GOTCHAS.md`（动手前必读，按你要动哪一块挑读）。
+2. 读 `docs/VISION.md`（短，全文；§3 平面锁定、§4 人机契约、§4c 三条命、§6 素材规则是承重的）。
+3. `npm install && npm run dev`，进菜单先看 30 秒 attract，再按「开始」玩两回合。
+4. 要改人机：`src/sim/ai.ts`；要改美术：`src/render/`；文案：`src/ui/i18n.ts`（⛔ 别在别处写死字符串）。
 
 ## Ops 速查
 
-- 本仓不装 playwright，借 `../evofootball-arena/node_modules/playwright`（chromium 已装）。
+- **无头验证**：本仓不装 playwright，借 `../evofootball-arena/node_modules/playwright`（chromium 已装）。
   起 `npx vite --port <空闲端口> --strictPort --host 127.0.0.1`，先 `curl | grep "<title>Ricochet"` 确认端口上是本项目。
-- 页面上 `window.rma.drive(seconds, {fire, move, torsoYaw, dash})` 不需要 pointer lock 就能推进模拟；
-  `window.rma.probe()` 拿位置/击杀/人机 safe 数/解/draw calls；`window.rma.hud.setOverlay(false)` 隐藏起始遮罩；
-  `window.rma.rig.toggle()` 切第三人称。截图脚本的形状：goto → waitForFunction(probe().drawCalls>0) → drive → screenshot。
-- 推送：仓库本地 credential helper 钉死个人号 ⇒ 直接 `git push`。⛔ 不要 `gh auth switch`。
-- 素材重生成：改 `assets-src/PROMPTS.md` → `codex exec --sandbox workspace-write < assets-src/PROMPTS.md`
-  （`image_generation` 是 Codex stable feature，已开）→ `./scripts/convert-assets.sh`。
+  页面上 `window.rma`：`drive(秒, {fire, move, torsoYaw, dash})` 不要 pointer lock 就推进模拟；`probe()` 拿位置/
+  分数/存活数/人机 safe 数/draw calls；`spectate(on)` / `attract(on)` / `roster(1|2|3)`；`hud.setOverlay(false)`
+  隐藏菜单；`mechs` / `slots`（每台机的 view/brain/marker/trail）。脚本形状：goto → waitForFunction(probe().drawCalls>0)
+  → drive → waitForTimeout → screenshot。
+- **推送**：仓库本地 credential helper 钉死个人号 ⇒ 直接 `git push`。⛔ 不要 `gh auth switch`。
+  部署验证看线上 `index-*.js` 哈希是否等于本地 `dist/assets`，⛔ 别按 run 标题判断（标题会撞词）。
+- **素材**：改 `assets-src/PROMPTS.md` → `codex exec --sandbox workspace-write < assets-src/PROMPTS.md`
+  （Codex `image_generation` stable，约 60 s/张，工具报 gpt-image 2.0）→ `./scripts/convert-assets.sh`。
+  机甲概念图 `assets-src/mech-concept.png`。
+- **音效**：Kenney CC0 原包在 `/tmp/kenney`（会丢，重下见 LOG 2026-09-13「性能、音效」条）；ffmpeg 转 AAC 进
+  `public/audio/sfx/`；文件名表在 `src/ui/audio.ts` 的 `SFX`。
+- **音乐**：`public/audio/menu.mp3`、`bgm.mp3`；战斗曲 start/loopStart 偏移在 `src/main.ts` 的 `MUSIC`。
 - Node ≥ 22.6 直跑 TS：`erasableSyntaxOnly`，⛔ 构造器参数属性（`constructor(private x)`）不能用。
+- 测试：`npm test`（vitest，只碰 `src/sim/`，20 条）。改 AI 打分或几何后必跑；改渲染后必截图。
 
-## 坑
+## 文档地图
 
-1. 脚本玩家在出生点朝墙连发会被自己的反弹打死（无头测试里出现过 5 次）。测对射时把双方摆到
-   `MAP_A` 第 5 行（z = -4，x ∈ [-12, 12]）这条开阔走廊上。
-2. 三方 r185 的光强是物理量级：Hemisphere 2.4 / Directional 3.2 / Ambient 0.9 才够亮，0.75/1.6 一片黑。
-3. 人机的反弹解如果每次都取最短路径，目标一动解就在几堵墙之间跳，炮塔永远转不到位 ⇒ 永远不开火。
-   已加转向代价（`findFireSolution` 的 `preferYaw`）。
-4. 炮口点默认在机体中心前 1.13 m：机体离墙不到 1.13 m 时炮口已在墙内，从墙内出发的射线看不见这堵墙，
-   子弹会直接穿过去（真人反馈「不贴墙也穿」）。所有从炮口起算的几何都要改从**机体中心**起算。
-5. 人机炮塔一旦和腿耦合，开火频率会掉一个量级（5 rad/s 时 15 s 只有 1–2 发）；调侵略性先动回正速率，
-   ⛔ 别放宽 `aimTolerance`（那是精度不是频率）。
-6. 「有视线」≠「有射击解」：视线用零宽射线、射击解用炮弹半径膨胀后的墙。两台人机曾在 13 m 外面对面
-   永久站定（都以为有视线、都没有解）。凡是给人机打分的几何判断，一律用 `shellWalls`。
-7. 人机炮塔被腿「带着转」只能在**移动时**生效：站立时腿会转向炮塔，若此时也带动炮塔，两者会互相追着原地转。
-8. 快进模拟（`rma.drive` 一帧推几十秒）会在一帧里制造上百个命中/反弹事件，每个事件一个 PointLight 就把
-   渲染拖死（截图 30 s 超时）。FX 灯光已封顶 8 个；快进后先 `waitForTimeout` 再截图。
-9. 墙顶灯带曾是一块和墙顶同尺寸的发光薄板，把整个墙顶盖成亮蓝色，从第一版起所有截图里「墙顶太亮」都是它，
-   不是光照。现在是沿四边的细边框（合并成一个 mesh）。
-10. 未加载完成的贴图渲染成**黑色**而不是「无贴图」：`map` 一律在 load 回调里再赋值（`getTexture`），
-    缺文件时保留平色。bloom 阈值要高于被照亮表面的线性亮度（现在 1.35，太阳 1.3 + 天光 1.5），
-    否则阳光面整片发光；只让 HDR 自发光体（倍率 1.5–2.0）过阈值。
-11. three 的 lit shader 按场景灯数编译：灯的数量一变就全部重编译。⛔ 别按事件增删 PointLight，用固定池、
-    用 intensity 0 表示空闲。改画质时允许变一次。
-12. 无头 Chromium 的帧时间（swiftshader 软渲染 ~200 ms）说明不了真机性能；性能结论只能来自真机
-    「Show frame time」读数。
-13. 驾驶舱枪模型挂在相机下面：任何用导演相机的模式（观战、attract）都要显式 `setViewmodelVisible(false)`，
-    否则大灰块出现在画面右下角（attract 第一版就是这样）。
-14. 无头 Chromium 里 `requestPointerLock` 必失败（WrongDocumentError），所以 Play→锁定→Esc→Resume 这条链
-    在无头里走不通，只能真机验。
-15. 无头 Chromium（swiftshader）截图偶发整页发白、HUD 半透明、左上角一个破图标 —— 同一状态再截一次就正常。
-   是合成器偶发不是产品问题；判定前先重截，⛔ 别按白图改渲染。
+- `docs/VISION.md` 最高层 authority；`docs/ROADMAP.md` 阶段唯一真相；`README.md` 只写已 ship 的。
+- `LOG.md` append-only，标题带 `#decision/#measure/#deadend/#incident/#ship`，`grep -n '^## ' LOG.md` 出目录。
+- `GOTCHAS.md` 现役陷阱，编号稳定；`TODO.md` 只放未来。

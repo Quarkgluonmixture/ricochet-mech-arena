@@ -2,7 +2,7 @@
 
 ## 接手顺序
 
-1. `CHECKPOINT.md` — 当前现场；`GOTCHAS.md`（若存在）— 编号稳定的耐久陷阱，动手前扫。
+1. `CHECKPOINT.md` — 当前现场；`GOTCHAS.md` — 编号稳定的现役陷阱，**动手前按「你要动哪一块」挑读**。
 2. `docs/VISION.md` — **用户想要什么的最高层 authority**。判断拿不准先对照它，写明用了哪一节。
 3. `docs/ROADMAP.md` — 阶段唯一真相；别处只放一行 cursor。
 4. `README.md` — **当前已 ship** 的规则 / 控制 / 架构。
