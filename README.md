@@ -30,9 +30,10 @@ npm run build    # tsc + vite → dist/
 
 Open `?spectate` in the URL to start in spectator mode.
 
-Live at <https://quarkgluonmixture.github.io/ricochet-mech-arena/> (GitHub Pages, deploys from `main`) and
-at <https://quarkspace.top/ricochet-mech-arena> (a copy of `dist/` inside the owner's site repository; it
-does **not** follow this repository — rebuild and re-copy to update it).
+Live at <https://quarkgluonmixture.github.io/ricochet-mech-arena/> (GitHub Pages, deploys from `main`). Also
+published as a copy of `dist/` inside the owner's site repository, to appear at
+<https://quarkspace.top/ricochet-mech-arena> when that site next deploys; the copy does **not** follow this
+repository — rebuild and re-copy to update it.
 
 ## PvE and EvE
 

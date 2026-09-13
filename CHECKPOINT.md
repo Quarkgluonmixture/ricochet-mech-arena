@@ -18,6 +18,8 @@
 - **第二个线上地址** <https://quarkspace.top/ricochet-mech-arena>：是 `dist/` 的一份**拷贝**，放在
   `../ai-model-observatory/public/ricochet-mech-arena/`（EdgeOne Pages 随该仓 `main` 发布，`next.config.ts` 里 307 到
   `index.html`，先例 `/deepseek`）。⛔ 它不跟本仓自动更新：改完代码要 `npm run build` → 重拷 → 到那边 commit + push。
+  ⚠ 2026-09-13 推上去时那个站的自动部署已冻结（08-26 起 webhook 死，见那边 LOG / issue #7），线上 404 直到 owner 在
+  EdgeOne 控制台手动 ReDeploy；验证 = `curl -sI https://quarkspace.top/ricochet-mech-arena` 见 307。
 
 ## 接手
 
