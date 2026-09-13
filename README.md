@@ -11,7 +11,7 @@ This README describes only what is shipped. Design intent lives in `docs/VISION.
 ```
 npm install
 npm run dev      # http://localhost:5173
-npm test         # sim-only tests on node
+npm test         # node tests: the sim, plus the kill-cam clock (src/ui/slowmo.ts)
 npm run build    # tsc + vite → dist/
 ```
 
@@ -29,6 +29,10 @@ npm run build    # tsc + vite → dist/
 | T | **watch AI vs AI**: both mechs run the same brain; drag to orbit, wheel to zoom, V for top-down, Esc back |
 
 Open `?spectate` in the URL to start in spectator mode.
+
+Live at <https://quarkgluonmixture.github.io/ricochet-mech-arena/> (GitHub Pages, deploys from `main`) and
+at <https://quarkspace.top/ricochet-mech-arena> (a copy of `dist/` inside the owner's site repository; it
+does **not** follow this repository — rebuild and re-copy to update it).
 
 ## PvE and EvE
 
@@ -67,6 +71,16 @@ at the top left names every kill and how it landed. Spawns: `P`/`B` blue, `E`/`R
 - HUD: score, shell pips, dash bar, threat markers around the crosshair for shells outside your view or
   predicted to reach you, a banner that names how each kill happened, and an "AI safe moves N/17" line so
   you can watch it get cornered.
+- **Kill cam.** Every kill (yours, the AI's, a teammate's, an own goal) runs the sim at ¼ speed for a beat:
+  0.06 s in, 0.85 s held, 0.4 s easing back out, all in real seconds, so a second kill during the first
+  restarts the hold without a frame at full speed. In the director views (Watch, the menu's attract scene,
+  and after you die) the camera whips onto the wreck and the mech that did it and pulls in close, then
+  drifts back to the full-field framing; in the cockpit the moment simply stretches and you keep control.
+  Letterbox bars and a "Kill cam · ¼ speed" caption mark it (not behind the menu). Two clocks: mech
+  animation, debris, dust and shell trails follow the slowed world; camera, HUD timers, hit flashes and UI
+  sounds stay in real time. World sounds pitch down with the sim and the music sinks under a low-pass.
+  The envelope is `KILLCAM` in `src/ui/slowmo.ts`; the camera framing is `focus()` in
+  `src/render/spectator.ts`.
 - Sound: Kenney CC0 samples (fire, ricochet = dark sci-fi metal thud plus a short heavy clank, both pitched
   down and low-passed, explosion, dash, engine hum per live shell, UI) with a
   synthesised sub-thump under each shot, positioned by bearing and distance, sent through a shared reverb

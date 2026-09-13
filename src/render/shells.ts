@@ -3,6 +3,9 @@ import { CFG } from '../sim/config.ts';
 import type { Shell } from '../sim/shell.ts';
 
 const TRAIL = 28;
+/** Append a trail point only after the head moved this far (m), so the tail keeps its length in slow
+ *  motion instead of bunching up behind the shell as frames outnumber sim steps. */
+const TRAIL_STEP = 0.2;
 
 interface View { mesh: THREE.Mesh; halo: THREE.Sprite; trail: THREE.Line; pts: Float32Array; cols: Float32Array; n: number; color: number }
 
@@ -65,6 +68,7 @@ export class ShellViews {
       v.halo.position.copy(v.mesh.position);
       // shift the trail and append the current position
       const pts = v.pts;
+      if (v.n > 0 && Math.hypot(s.pos.x - pts[0], s.pos.z - pts[2]) < TRAIL_STEP) continue;
       if (v.n < TRAIL) v.n++;
       for (let i = TRAIL - 1; i > 0; i--) {
         pts[i * 3] = pts[(i - 1) * 3]; pts[i * 3 + 1] = pts[(i - 1) * 3 + 1]; pts[i * 3 + 2] = pts[(i - 1) * 3 + 2];

@@ -19,6 +19,7 @@ import { Hud } from './ui/hud.ts';
 import { setLang, t } from './ui/i18n.ts';
 import { Radar } from './ui/radar.ts';
 import { loadSettings, saveSettings } from './ui/settings.ts';
+import { SlowMo } from './ui/slowmo.ts';
 import { ThreatRing } from './ui/threat.ts';
 
 declare const __BUILD__: string;
@@ -50,6 +51,11 @@ let world = new World(arena);
 let slots: Slot[] = [];
 let player: Mech = world.addMech('you', true, arena.spawns.player, arena.spawnYaw.player, 'blue');
 let shellViews = new ShellViews(scene, () => COLORS.you, QUALITY[settings.quality].shellLights);
+/** Kill cam: the sim runs at quarter speed for a beat after every kill (TODO 观赏性 2). In director modes the
+ *  camera swings onto the victim and the shooter; in the cockpit you just get the moment stretched. Mech ids,
+ *  not mech objects: the roster can be rebuilt underneath it (GOTCHAS #16). */
+const slowmo = new SlowMo();
+let killcam: { victim: number; shooter: number } | null = null;
 
 function buildRoster(n: number): void {
   for (const s of slots) { s.view.dispose(); s.marker.dispose(); s.trail.dispose(); }
@@ -65,6 +71,7 @@ function buildRoster(n: number): void {
   shellViews.sync([]);
   shellViews = new ShellViews(scene, (owner) => teamColor(world.mechs[owner]?.team ?? 'red'), QUALITY[settings.quality].shellLights);
   hud.clearFeed();
+  killcam = null; slowmo.reset(); spec.focus(null);
   applyLives();
 }
 
@@ -369,6 +376,8 @@ function handleEvents(): void {
         }
         audio.hit(e.pos);
         fx.hit(e.pos.x, e.pos.z, teamColor(victim.team));
+        slowmo.trigger();
+        killcam = { victim: victim.id, shooter: shooter.id };
         if (attract) break;
         const own = shooter.id === victim.id;
         const friendly = !own && shooter.team === victim.team;
@@ -391,6 +400,7 @@ function handleEvents(): void {
         roundAnnounced = false;
         yaw = player.torsoYaw;
         rig.pitch = 0;
+        killcam = null; slowmo.reset(); // a manual reset mid kill cam must not leave the camera on a respawned mech
         for (const s of slots) s.trail.reset();
         if (!attract) audio.round();
         break;
@@ -446,24 +456,31 @@ function frame(now: number): void {
   frameMs += (raw - frameMs) * 0.08;
   fpsTimer += dt;
   if (settings.showFps && fpsTimer > 0.4) { fpsTimer = 0; hud.setFps(frameMs); }
+  // kill cam: `sdt` is world time (sim, animation, debris, dust), `dt` stays screen time (camera, HUD)
+  const scale = slowmo.step(dt);
+  const sdt = dt * scale;
   if (locked || spectating || attract) {
-    acc += dt;
+    acc += sdt;
     while (acc >= STEP) { simStep(aiVsAi() ? null : playerInput()); acc -= STEP; }
   }
   const humanFpv = !aiVsAi() && player.alive && rig.mode === 'first';
   for (const s of slots) {
-    s.view.update(s.mech, dt);
+    s.view.update(s.mech, sdt);
     if (s.mech.id === player.id) s.view.root.visible = player.alive && !humanFpv;
     s.marker.update(s.mech, camera, dt);
     s.marker.setVisible(!attract && s.mech.id !== player.id && (s.mech.team !== player.team || spectating));
-    s.trail.update(s.mech, dt);
+    s.trail.update(s.mech, sdt);
   }
   shellViews.sync(world.shells);
-  fx.update(dt);
-  updateScene(dt);
+  fx.update(dt, sdt);
+  updateScene(sdt);
   // dead humans watch the rest of the round through the director camera
   const directorCam = aiVsAi() || !player.alive;
   rig.setViewmodelVisible(!directorCam && rig.mode === 'first');
+  const kc = slowmo.active && killcam ? killcam : null;
+  spec.focus(kc ? [world.mechs[kc.victim], ...(kc.shooter !== kc.victim ? [world.mechs[kc.shooter]] : [])].filter((m) => m !== undefined) : null);
+  hud.setKillcam(slowmo.depth, !attract);
+  audio.setTimeScale(scale);
   if (directorCam) spec.update(world.mechs, dt); else rig.update(player, dt);
   if (directorCam) audio.setListener({ x: camera.position.x, z: camera.position.z }, spec.yaw());
   else audio.setListener(player.pos, player.torsoYaw);
@@ -489,7 +506,7 @@ window.rma = {
   get world() { return world; }, get player() { return player; }, get enemy() { return world.mechs.find((m) => m.team !== player.team)!; },
   get mechs() { return world.mechs; }, get slots() { return slots; },
   get aiState() { return slots[world.mechs.find((m) => m.team !== player.team)!.id].state; }, get blueState() { return slots[player.id].state; },
-  CFG, rig, spec, hud, stats, audio, MUSIC, settings,
+  CFG, rig, spec, hud, stats, audio, MUSIC, settings, slowmo,
   spectate(on: boolean): void { setSpectate(on); },
   attract(on: boolean): void { setAttract(on); },
   roster(n: 1 | 2 | 3): void { settings.matchSize = n; buildRoster(n); },
@@ -511,6 +528,7 @@ window.rma = {
       alive: { blue: world.alive('blue').length, red: world.alive('red').length },
       aiSafe: slots[enemy.id].state.lastSafe, aiCandidates: slots[enemy.id].state.lastCandidates, aiSolution: slots[enemy.id].state.solution, stats: { ...stats, fires: [...stats.fires] },
       drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, music: audio.currentTrack,
+      timeScale: slowmo.scale, killcam: killcam ? { ...killcam, focusing: spec.focusing } : null, camera: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
     };
   },
 };

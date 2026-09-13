@@ -46,6 +46,8 @@ export class Hud {
   private lifePips: HTMLElement[] = [];
   private damage = $('damage');
   private shield = $('shield');
+  private killcam = $('killcam');
+  private killcamOn = false;
 
   /** Show the menu. `inProgress` turns the primary item into Resume. */
   /** Life pips under the score; `last` turns the remaining one red and pulsing. */
@@ -63,6 +65,14 @@ export class Hud {
     this.damage.classList.add('flash');
   }
   setShield(on: boolean): void { this.shield.classList.toggle('on', on); }
+  /** Kill cam dressing: letterbox bars + a caption, faded by `depth` (0 = off, 1 = full slow motion).
+   *  Lives outside #hud so it also shows over the attract scene; `bars` false keeps just the caption off. */
+  setKillcam(depth: number, bars: boolean): void {
+    const on = depth > 0.02;
+    if (on !== this.killcamOn) { this.killcamOn = on; this.killcam.classList.toggle('on', on); }
+    this.killcam.classList.toggle('bars', bars);
+    if (on) this.killcam.style.setProperty('--k', depth.toFixed(3));
+  }
 
   setOverlay(visible: boolean, inProgress = false): void {
     this.overlay.classList.toggle('hidden', !visible);

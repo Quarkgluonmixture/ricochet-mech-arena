@@ -9,6 +9,10 @@ const angleDiff = (a: number, b: number) => { let d = (b - a) % (Math.PI * 2); i
  * AI-vs-AI camera. Director mode frames both mechs from the side of their line, pulling back as they
  * separate; top mode looks straight down on the midpoint. Drag orbits, wheel zooms. Smoothed so the
  * cut never jerks when the pair swaps sides.
+ *
+ * Kill cam: `focus(victim, shooter)` swings the camera onto that pair (or onto the wreck alone for an own
+ * goal) and pulls in close; `focus(null)` lets it drift back to the full-field framing. The swing runs on
+ * real time while the sim is slowed, so it reads as a whip pan, not a slow-motion drift.
  */
 export class SpectatorCamera {
   mode: SpecMode = 'director';
@@ -21,13 +25,18 @@ export class SpectatorCamera {
   private pos = new THREE.Vector3();
   private look = new THREE.Vector3();
   private init = false;
+  private focused: Mech[] | null = null;
 
   constructor(camera: THREE.PerspectiveCamera) { this.camera = camera; }
 
   orbit(dTheta: number): void { this.thetaOffset += dTheta; }
   zoomBy(f: number): void { this.zoom = clamp(this.zoom * f, 0.45, 2.4); }
   toggle(): SpecMode { this.mode = this.mode === 'director' ? 'top' : 'director'; return this.mode; }
-  reset(): void { this.init = false; this.thetaOffset = 0; this.zoom = 1; }
+  reset(): void { this.init = false; this.thetaOffset = 0; this.zoom = 1; this.focused = null; }
+
+  /** Frame these mechs (dead ones included: a wreck keeps its position) instead of everyone alive. */
+  focus(mechs: Mech[] | null): void { this.focused = mechs && mechs.length > 0 ? mechs : null; }
+  get focusing(): boolean { return this.focused !== null; }
 
   /** Yaw of the camera's forward in the XZ plane, for positional audio. */
   yaw(): number {
@@ -38,12 +47,20 @@ export class SpectatorCamera {
 
   update(mechs: Mech[], dt: number): void {
     this.thetaOffset += this.autoOrbit * dt;
+    const focus = this.focused;
     const live = mechs.filter((m) => m.alive);
-    const pts = live.length > 0 ? live : mechs;
+    const pts = focus ?? (live.length > 0 ? live : mechs);
     // centroid and the farthest-apart pair: the pair sets the side the camera stands on, the spread sets the distance
     let mx = 0, mz = 0;
-    for (const m of pts) { mx += m.pos.x; mz += m.pos.z; }
-    mx /= pts.length; mz /= pts.length;
+    if (focus) {
+      // the kill cam looks mostly at the victim (first), a little towards the shooter
+      const w = focus.length > 1 ? 0.62 : 1;
+      mx = focus[0].pos.x * w; mz = focus[0].pos.z * w;
+      for (let i = 1; i < focus.length; i++) { mx += focus[i].pos.x * (1 - w) / (focus.length - 1); mz += focus[i].pos.z * (1 - w) / (focus.length - 1); }
+    } else {
+      for (const m of pts) { mx += m.pos.x; mz += m.pos.z; }
+      mx /= pts.length; mz /= pts.length;
+    }
     let a = pts[0], b = pts[pts.length - 1], best = -1;
     for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
       const d = Math.hypot(pts[i].pos.x - pts[j].pos.x, pts[i].pos.z - pts[j].pos.z);
@@ -55,7 +72,7 @@ export class SpectatorCamera {
     const target = new THREE.Vector3();
     const lookAt = new THREE.Vector3(mx, 1, mz);
     if (this.mode === 'top') {
-      const h = clamp((sep * 1.1 + 16) * this.zoom, 18, 70);
+      const h = focus ? clamp((sep * 0.9 + 9) * this.zoom, 12, 40) : clamp((sep * 1.1 + 16) * this.zoom, 18, 70);
       target.set(mx, h, mz);
       lookAt.set(mx, 0, mz);
       this.camera.up.set(0, 0, -1);
@@ -70,14 +87,17 @@ export class SpectatorCamera {
         this.theta += Math.abs(d) < step ? d : Math.sign(d) * step;
       }
       const phi = this.theta + this.thetaOffset;
-      const D = clamp((sep * 0.85 + 8) * this.zoom, 9, 48);
-      target.set(mx + Math.cos(phi) * D, D * 0.62 + 2, mz + Math.sin(phi) * D);
+      // kill cam: closer and lower, so the wreck and the shell that did it fill the frame
+      const D = focus ? clamp((sep * 0.6 + 5.5) * this.zoom, 6, 22) : clamp((sep * 0.85 + 8) * this.zoom, 9, 48);
+      target.set(mx + Math.cos(phi) * D, focus ? D * 0.42 + 1.6 : D * 0.62 + 2, mz + Math.sin(phi) * D);
       this.camera.up.set(0, 1, 0);
     }
     if (!this.init) { this.pos.copy(target); this.look.copy(lookAt); this.init = true; }
     else {
-      this.pos.lerp(target, 1 - Math.exp(-dt * 3));
-      this.look.lerp(lookAt, 1 - Math.exp(-dt * 4));
+      // whip onto a kill, drift back off it
+      const kp = focus ? 7 : 3, kl = focus ? 10 : 4;
+      this.pos.lerp(target, 1 - Math.exp(-dt * kp));
+      this.look.lerp(lookAt, 1 - Math.exp(-dt * kl));
     }
     this.camera.position.copy(this.pos);
     this.camera.lookAt(this.look);

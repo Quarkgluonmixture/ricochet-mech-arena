@@ -3,6 +3,9 @@ import { CFG } from '../sim/config.ts';
 import { hdr } from './assets.ts';
 
 interface Particle { obj: THREE.Object3D; life: number; ttl: number; vel?: THREE.Vector3; grow?: number; shrink?: boolean; mat?: THREE.Material & { opacity: number } }
+/** Light lives in screen time, matter in world time: a hit flash that ran on the slowed clock became a
+ *  1.8 s translucent dome sitting on top of the wreck the kill cam was framing. */
+const isLight = (p: Particle) => p.vel === undefined;
 interface Flash { light: THREE.PointLight; life: number; ttl: number; peak: number }
 
 const FLASH_POOL = 4;
@@ -73,7 +76,8 @@ export class Fx {
     slot.life = 0; slot.ttl = ttl; slot.peak = intensity;
   }
 
-  update(dt: number): void {
+  /** `dt` = real seconds (flashes, rings, the hit burst), `worldDt` = sim seconds (debris). */
+  update(dt: number, worldDt = dt): void {
     for (const fl of this.flashes) {
       if (fl.ttl <= 0) continue;
       fl.life += dt;
@@ -83,7 +87,8 @@ export class Fx {
     }
     for (let i = this.items.length - 1; i >= 0; i--) {
       const p = this.items[i];
-      p.life += dt;
+      const step = isLight(p) ? dt : worldDt;
+      p.life += step;
       const f = p.life / p.ttl;
       if (f >= 1) {
         this.scene.remove(p.obj);
@@ -94,10 +99,10 @@ export class Fx {
       if (p.grow) p.obj.scale.setScalar(0.3 + p.grow * f);
       if (p.shrink) p.obj.scale.setScalar(f < 0.7 ? 1 : Math.max(0.01, 1 - (f - 0.7) / 0.3));
       if (p.vel) {
-        p.vel.y -= 18 * dt;
-        p.obj.position.addScaledVector(p.vel, dt);
+        p.vel.y -= 18 * step;
+        p.obj.position.addScaledVector(p.vel, step);
         if (p.obj.position.y < 0.08) { p.obj.position.y = 0.08; p.vel.y *= -0.35; p.vel.x *= 0.7; p.vel.z *= 0.7; }
-        p.obj.rotation.x += dt * 5; p.obj.rotation.z += dt * 3;
+        p.obj.rotation.x += step * 5; p.obj.rotation.z += step * 3;
       }
       if (p.mat) p.mat.opacity = 1 - f;
     }

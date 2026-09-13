@@ -13,7 +13,8 @@
 - **平面锁定 + 只弹墙**（VISION §3）是承重决策：⛔ 不加跳跃、蹲、坡道、地板/天花板反弹。
 - **人机契约**（VISION §4）：人机与玩家共用同一套运动模型；只读几何真相（位置/速度/墙/在飞炮弹），
   ⛔ 不读玩家输入。人机只能被几何打死；难度旋钮是墙和在飞弹数，不是反应时间。
-- `src/sim/` 不得 import three；渲染只在 `src/render/`、`src/ui/`。测试跑在 node 上只碰 sim。
+- `src/sim/` 不得 import three；渲染只在 `src/render/`、`src/ui/`。测试跑在 node 上，只碰 sim 和不碰 DOM/three 的
+  纯函数模块（如 `src/ui/slowmo.ts`）。
 - 素材只进渲染层，sim 不依赖；删掉 `public/textures/` 游戏必须照常能玩（VISION §6）。生成 prompt 在
   `assets-src/PROMPTS.md`，重生成 = 改 prompt 重跑 Codex 生图，⛔ 别手修 PNG。
 

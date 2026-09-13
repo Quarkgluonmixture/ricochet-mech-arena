@@ -26,7 +26,7 @@ const SFX: Record<string, string[]> = {
 
 export type UiSound = 'click' | 'confirm' | 'back' | 'switch' | 'error';
 
-interface Hum { src: AudioBufferSourceNode; gain: GainNode; pan: StereoPannerNode }
+interface Hum { src: AudioBufferSourceNode; gain: GainNode; pan: StereoPannerNode; /** playbackRate at real time */ rate: number }
 
 export class Audio {
   private ctx: AudioContext | null = null;
@@ -43,6 +43,10 @@ export class Audio {
   private listenerYaw = 0;
   private loading: Promise<void> | null = null;
   private volumes = { sfx: 0.8, music: 0.6 };
+  private musicLp!: BiquadFilterNode;
+  /** Kill-cam time scale (1 = real time). Pitches every new one-shot and every live hum down with the sim,
+   *  and closes a low-pass over the music, so slow motion is heard as well as seen. */
+  private timeScale = 1;
   /** Load progress for the start screen. */
   loaded = 0;
   total = 0;
@@ -67,9 +71,14 @@ export class Audio {
     this.sfxBus.connect(this.sfxDuck);
     this.musicDuck = ctx.createGain();
     this.musicDuck.connect(this.master);
+    this.musicLp = ctx.createBiquadFilter();
+    this.musicLp.type = 'lowpass';
+    this.musicLp.frequency.value = 20000;
+    this.musicLp.Q.value = 0.5;
+    this.musicLp.connect(this.musicDuck);
     this.musicBus = ctx.createGain();
     this.musicBus.gain.value = this.volumes.music;
-    this.musicBus.connect(this.musicDuck);
+    this.musicBus.connect(this.musicLp);
     // reverb: 1.6 s exponentially decaying stereo noise, a little darker on the tail
     this.reverb = ctx.createConvolver();
     const len = Math.floor(ctx.sampleRate * 1.6);
@@ -146,6 +155,18 @@ export class Audio {
     this.musicDuck.gain.setTargetAtTime(music, this.ctx.currentTime, 0.3);
   }
 
+  /** Slow motion: `scale` is the sim-clock multiplier this frame. Cheap to call every frame. */
+  setTimeScale(scale: number): void {
+    const s = Math.max(0.05, Math.min(1, scale));
+    if (Math.abs(s - this.timeScale) < 1e-3) return;
+    this.timeScale = s;
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    // 20 kHz at real time, ~900 Hz at quarter speed: the music sinks under the moment, it does not stop
+    this.musicLp.frequency.setTargetAtTime(20000 * Math.pow(s, 2.25), now, 0.08);
+    for (const h of this.hums.values()) h.src.playbackRate.setTargetAtTime(h.rate * s, now, 0.06);
+  }
+
   setListener(pos: Vec2, yaw: number): void { this.listenerPos = pos; this.listenerYaw = yaw; }
 
   private spatial(pos: Vec2): { pan: number; gain: number } {
@@ -174,7 +195,8 @@ export class Audio {
     const src = ctx.createBufferSource();
     src.buffer = buf;
     const v = opts.pitchVar ?? 0.08;
-    src.playbackRate.value = (opts.pitch ?? 1) * (1 + (Math.random() * 2 - 1) * v);
+    // world sounds slow down with the sim; UI, round and the player's own damage cues stay in screen time
+    src.playbackRate.value = (opts.pitch ?? 1) * (1 + (Math.random() * 2 - 1) * v) * (pos ? this.timeScale : 1);
     const g = ctx.createGain();
     const sp = pos ? this.spatial(pos) : { pan: 0, gain: 1 };
     g.gain.value = level * sp.gain;
@@ -251,13 +273,14 @@ export class Audio {
         const src = ctx.createBufferSource();
         src.buffer = buf;
         src.loop = true;
-        src.playbackRate.value = (s.owner === playerId ? 1.15 : 0.95) * (1 + (Math.random() - 0.5) * 0.1);
+        const rate = (s.owner === playerId ? 1.15 : 0.95) * (1 + (Math.random() - 0.5) * 0.1);
+        src.playbackRate.value = rate * this.timeScale;
         const gain = ctx.createGain();
         gain.gain.value = 0;
         const pan = ctx.createStereoPanner();
         src.connect(gain).connect(pan).connect(this.sfxBus);
         src.start();
-        h = { src, gain, pan };
+        h = { src, gain, pan, rate };
         this.hums.set(s.id, h);
       }
       const sp = this.spatial(s.pos);
