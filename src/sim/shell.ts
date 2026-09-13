@@ -1,5 +1,5 @@
 import { CFG } from './config.ts';
-import { type Aabb, type Vec2, add, len, raycast, reflect, scale } from './geom.ts';
+import { type Aabb, type Vec2, add, inside, len, raycast, reflect, scale } from './geom.ts';
 
 export interface ShellState {
   pos: Vec2;
@@ -49,6 +49,9 @@ export function advanceShell(s: ShellState, dt: number, walls: Aabb[], maxBounce
   }
   s.age += dt;
   if (s.age > CFG.shell.lifetime) s.alive = false;
+  // Invariant: a shell is never inside a wall. A ray born inside a box cannot see that box, so a shell
+  // that somehow got in would sail straight through; kill it at the wall instead.
+  if (s.alive) for (const w of walls) if (inside(s.pos, w)) { s.alive = false; break; }
 }
 
 /** Sample a shell's future at t = dt, 2dt, … up to horizon. Stops early when the shell dies. */

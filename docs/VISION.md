@@ -58,6 +58,19 @@ floor or ceiling. Consequences that this repo relies on:
   It may lead its target using the target's current velocity. It may not read the player's *inputs*.
 - **Reads world truth for geometry only.** Positions, velocities, walls, and live shells are public in
   this game (they are visible on the 2D reference). That is allowed. Player intent is not.
+- **Its aim is a body, not a cursor** (user, 2026-09-13: "turn the upper body with it — cooler, and it
+  stops shooting straight at me while it turns"). The movement model is shared with the player; the
+  *aim* model is where the AI's humanity lives: its torso rides on its legs, slews back at a bounded rate,
+  and cannot point outside a cone around the body. A target behind it means turning first. The player's
+  mouse has none of these limits. Fire rate, slew rate and cone are the aggression knobs; dodge quality
+  is never one.
+
+## §4b Round resolution
+
+The first hit decides the round. From that step on every survivor is invulnerable and the AI stops
+shooting (it keeps dodging: a mech standing still reads as broken). Hits landing in the very same step as
+the first one still count, so a genuine trade is a draw. Otherwise a player who dies could still "win" from
+shells already in the air, which the first playtest correctly called nonsense.
 
 ## §5 What first person costs, and what pays it back
 

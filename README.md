@@ -32,9 +32,14 @@ npm run build    # tsc + vite → dist/
 - One arena (`MAP_A` in `src/sim/arena.ts`), 180°-rotation symmetric, 4 m corridors, **1.5 m walls**:
   they block shells (flying at 1.2 m) but not your 1.9 m eye, so you see the enemy's torso over the maze.
 - Shells fly at 16 m/s, bounce **once** off walls, die on the second wall or after 5 s. They hit anyone,
-  including the shooter after the first bounce or 0.15 s. One hit kills; the round resets 2 s later.
+  including the shooter after the first bounce or 0.15 s. One hit kills. **The first hit decides the
+  round**: survivors are invulnerable until the reset 2 s later (a trade in the same step is a draw).
+- A shell leaves 1.13 m ahead of the mech, or just short of a wall if one is closer, so it can never be
+  born inside a wall. Firing point-blank into a wall is an own goal.
 - The AI has exactly your movement model (`stepMotion` in `src/sim/mech.ts` is the only one), 2 shells
-  in flight, one shot per second at most, and a torso that slews at 6 rad/s.
+  in flight, one shot per second at most. Its torso rides on its legs (turning the body swings the aim),
+  slews back at 7 rad/s, and cannot aim more than 100° off the body; standing still, the legs turn in place
+  towards the aim. Your mouse has no such limits.
 - Finding it: an always-on-top diamond over the enemy's head, a bearing marker with distance around the
   crosshair whenever it is outside your view, and a rotating radar (walls, both mechs pinned to the rim
   when out of range, live shells and their predicted paths). Its recent path is drawn on the floor so the
@@ -62,7 +67,10 @@ it actually gets to fire against a moving target. It never reads your inputs.
 - Standing player at spawn: killed at 9.2 s by a bank shot off the corridor wall.
 - Tests: the AI dodges a direct shot on open ground, dies in a 1.6 m corridor it cannot sidestep in,
   never exceeds the speed cap; a bank-shot solution flown with the real shell model arrives after
-  exactly one bounce.
+  exactly one bounce; a shell that arrives after the round is decided cannot hit the survivor; shells
+  fired against or 1 m off a wall bounce instead of tunnelling.
+- With the body-coupled torso (same duel, 15 s): 3–4 AI shots, first kill at 10.8 s; before it, 7 shots
+  in 20 s and a kill at 1.6 s. The AI is deliberately less of a turret now.
 
 ## Layout
 

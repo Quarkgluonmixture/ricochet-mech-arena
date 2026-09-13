@@ -21,13 +21,16 @@ export interface AiState {
   move: Vec2;
   dash: boolean;
   torsoYaw: number;
+  /** Legs yaw seen last frame: the torso is carried by whatever the legs turned since. */
+  lastLegsYaw: number;
+  round: number;
   solution: FireSolution | null;
   /** Diagnostics for the HUD / tests. */
   lastSafe: number;
   lastCandidates: number;
 }
 
-export const makeAiState = (yaw = 0): AiState => ({ replanT: 0, move: { x: 0, z: 0 }, dash: false, torsoYaw: yaw, solution: null, lastSafe: 0, lastCandidates: 0 });
+export const makeAiState = (yaw = 0): AiState => ({ replanT: 0, move: { x: 0, z: 0 }, dash: false, torsoYaw: yaw, lastLegsYaw: yaw, round: -1, solution: null, lastSafe: 0, lastCandidates: 0 });
 
 /** Where the target will be when a shell fired now over `pathLen` metres arrives. Two fixed-point iterations. */
 function leadPoint(from: Vec2, target: Mech, speed: number): Vec2 {
@@ -46,7 +49,6 @@ function leadPoint(from: Vec2, target: Mech, speed: number): Vec2 {
  * beyond what a player could compute — this is plain geometry).
  */
 export function findFireSolution(self: Mech, target: Mech, shellWalls: Aabb[], speed: number = CFG.shell.speed, preferYaw?: number): FireSolution | null {
-  const muzzleOffset = self.radius + CFG.shell.radius + 0.25;
   const origin = self.pos;
   const aim = leadPoint(origin, target, speed);
   const straight = sub(aim, origin);
@@ -55,10 +57,10 @@ export function findFireSolution(self: Mech, target: Mech, shellWalls: Aabb[], s
   // marginally shorter one that needs a 90° slew (which would never fire against a moving target).
   const cost = (sol: FireSolution) => sol.length + (preferYaw === undefined ? 0 : Math.abs(angleDiff(preferYaw, yawOf(sol.dir))) * 8);
 
-  // direct
+  // direct. Rays start at the mech CENTRE, never at the nominal muzzle: the muzzle can lie inside a wall
+  // when the mech is within ~1.1 m of it, and a ray born inside a box does not see that box.
   const dirDirect = norm(straight);
-  const muzzle = add(origin, scale(dirDirect, muzzleOffset));
-  if (segmentClear(muzzle, aim, shellWalls)) return { dir: dirDirect, via: null, length: len(straight) };
+  if (segmentClear(origin, aim, shellWalls)) return { dir: dirDirect, via: null, length: len(straight) };
 
   let best: FireSolution | null = null;
   let bestCost = Infinity;
@@ -84,10 +86,9 @@ export function findFireSolution(self: Mech, target: Mech, shellWalls: Aabb[], s
       const within = f.axis === 'x' ? hit.z >= w.minZ && hit.z <= w.maxZ : hit.x >= w.minX && hit.x <= w.maxX;
       if (!within) continue;
       const dir = norm(d);
-      const m2 = add(origin, scale(dir, muzzleOffset));
-      // leg 1 must reach THIS face first
-      const legLen = dist(m2, hit);
-      const h = raycast(m2, dir, shellWalls, legLen - 1e-3);
+      // leg 1, from the centre, must reach THIS face first
+      const legLen = dist(origin, hit);
+      const h = raycast(origin, dir, shellWalls, legLen - 1e-3);
       if (h) continue;
       // leg 2 must be clear and must not pass through the shooter
       const back = add(hit, scale(f.axis === 'x' ? { x: f.side, z: 0 } : { x: 0, z: f.side }, 1e-3));
@@ -179,10 +180,13 @@ export function planMove(world: World, self: Mech, target: Mech, st: AiState): {
 
 /** One frame of AI control. Replans on its interval; slews the torso every frame. */
 export function aiThink(world: World, self: Mech, target: Mech, st: AiState, dt: number): MechInput {
-  if (!self.alive || !target.alive) {
+  if (!self.alive) {
     st.move = { x: 0, z: 0 };
     return { move: st.move, torsoYaw: st.torsoYaw, dash: false, fire: false };
   }
+  // Once the round is decided it keeps dodging (it is invulnerable, but standing still looks broken)
+  // and stops shooting: nothing it fires now can count.
+  const live = target.alive && !world.roundOver;
   st.replanT -= dt;
   if (st.replanT <= 0) {
     st.replanT = CFG.ai.replanInterval;
@@ -191,14 +195,25 @@ export function aiThink(world: World, self: Mech, target: Mech, st: AiState, dt:
     st.dash = plan.dash;
     st.lastSafe = plan.safe;
     st.lastCandidates = plan.total;
-    st.solution = findFireSolution(self, target, world.shellWalls, CFG.shell.speed, st.torsoYaw);
+    st.solution = live ? findFireSolution(self, target, world.shellWalls, CFG.shell.speed, st.torsoYaw) : null;
   }
+  // Torso model (AI only; the player's mouse is free):
+  // 1. the torso rides on the legs — whatever the body turned since last frame, the torso turns too;
+  if (st.round !== world.round) { st.round = world.round; st.torsoYaw = self.torsoYaw; st.lastLegsYaw = self.legsYaw; }
+  st.torsoYaw += angleDiff(st.lastLegsYaw, self.legsYaw);
+  st.lastLegsYaw = self.legsYaw;
+  // 2. then it slews back towards the aim at a bounded rate;
   const wantYaw = st.solution ? yawOf(st.solution.dir) : yawOf(sub(target.pos, self.pos));
   const d = angleDiff(st.torsoYaw, wantYaw);
   const maxStep = CFG.mech.torsoTurnRateAI * dt;
   st.torsoYaw += Math.abs(d) < maxStep ? d : Math.sign(d) * maxStep;
+  // 3. and it cannot aim outside the cone around the legs — a target behind it needs a body turn first.
+  const rel = angleDiff(self.legsYaw, st.torsoYaw);
+  const cone = CFG.ai.aimCone;
+  if (rel > cone) st.torsoYaw = self.legsYaw + cone;
+  else if (rel < -cone) st.torsoYaw = self.legsYaw - cone;
   const onTarget = st.solution !== null && Math.abs(angleDiff(st.torsoYaw, wantYaw)) < CFG.ai.aimTolerance;
-  const fire = onTarget && self.fireCd <= 0 && self.shellsOut < self.maxShells;
+  const fire = live && onTarget && self.fireCd <= 0 && self.shellsOut < self.maxShells;
   const dash = st.dash;
   st.dash = false; // a dash is a one-frame request
   return { move: st.move, torsoYaw: st.torsoYaw, dash, fire };

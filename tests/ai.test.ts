@@ -79,6 +79,42 @@ describe('AI contract (VISION §4)', () => {
   });
 });
 
+describe('round resolution', () => {
+  it('a shell that arrives after the round is decided cannot hit the survivor', () => {
+    // narrow corridor: the AI cannot sidestep, so without invulnerability the player's shell WOULD kill it
+    const rows = ['#########', '#P.....E#', '#########'];
+    const saved = CFG.cell;
+    CFG.cell = 1.6;
+    try {
+      const world = new World(buildArena(rows));
+      const p = world.addMech('player', true, world.arena.spawns.player);
+      const a = world.addMech('ai', false, world.arena.spawns.enemy);
+      const yaw = Math.atan2(-(a.pos.x - p.pos.x), -(a.pos.z - p.pos.z));
+      p.torsoYaw = yaw;
+      a.maxShells = 0;
+      // an AI shell already 1.5 m from the player, flying at it: lands in ~0.1 s
+      world.shells.push({ id: 999, owner: a.id, pos: { x: p.pos.x + 1.5, z: p.pos.z }, prev: { x: p.pos.x + 1.5, z: p.pos.z }, vel: { x: -CFG.shell.speed, z: 0 }, bounces: 0, age: 1, alive: true });
+      a.shellsOut = 1;
+      const st = makeAiState(0);
+      // the player fires at t=0; its shell needs ~0.6 s to cross the corridor. The AI's lands at ~0.04 s.
+      const hits = run(world, st, 0.2, (t) => ({ fire: t < 0.02, yaw }));
+      expect(hits).toEqual([p.id]);
+      expect(world.shells.some((sh) => sh.owner === p.id && sh.alive)).toBe(true); // the player's shell is still flying
+      for (let t = 0; t < 1.5; t += DT) {
+        const aiInput = aiThink(world, a, p, st, DT);
+        world.step(DT, [{ move: { x: 0, z: 0 }, torsoYaw: yaw, dash: false, fire: false }, aiInput]);
+      }
+      expect(p.alive).toBe(false);
+      expect(a.alive).toBe(true);
+      expect(p.kills).toBe(0);
+      expect(a.kills).toBe(1);
+      expect(world.roundOver).toBe(true);
+    } finally {
+      CFG.cell = saved;
+    }
+  });
+});
+
 describe('bank-shot solver', () => {
   it('finds a one-bounce solution around a pillar and the simulated shell actually arrives', () => {
     // pillar between the two; the north wall offers a bounce

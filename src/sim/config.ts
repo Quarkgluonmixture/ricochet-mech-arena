@@ -24,9 +24,10 @@ export const CFG = {
     /** Camera height for the first-person view (render only). Above the walls on purpose. */
     eyeHeight: 1.9,
     /** Torso (turret) slew rate for the AI, rad/s. The player's mouse is unbounded. */
-    torsoTurnRateAI: 6,
-    /** Visual only: how fast the legs turn to face the movement direction. */
-    legsTurnRate: 10,
+    torsoTurnRateAI: 7,
+    /** How fast the legs turn to face the movement direction (or, standing still, the torso). For the AI
+     *  this is gameplay: its torso is carried by the legs and limited to an aim cone around them. */
+    legsTurnRate: 8,
   },
 
   shell: {
@@ -62,6 +63,9 @@ export const CFG = {
     aimTolerance: 0.035,
     /** Extra clearance the AI demands between itself and a predicted shell. */
     dodgeMargin: 0.15,
+    /** The AI's torso may aim at most this far (rad) from where its legs face. A target behind it means
+     *  turning the body first — so a turning mech is visibly not shooting at you (user, 2026-09-13). */
+    aimCone: (100 * Math.PI) / 180,
   },
 
   round: { respawnDelay: 2.0 },

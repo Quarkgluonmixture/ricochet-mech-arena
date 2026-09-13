@@ -15,7 +15,7 @@ export function createScene(container: HTMLElement, arena: Arena): SceneBundle {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.15;
   container.appendChild(renderer.domElement);
@@ -27,17 +27,22 @@ export function createScene(container: HTMLElement, arena: Arena): SceneBundle {
   const camera = new THREE.PerspectiveCamera(78, 1, 0.08, 220);
   camera.rotation.order = 'YXZ';
 
-  scene.add(new THREE.HemisphereLight(0xc4d2f0, 0x3a3128, 2.4));
+  // more sky, less sun: keeps sunlit wall tops from glaring against shadowed sides
+  scene.add(new THREE.HemisphereLight(0xc4d2f0, 0x3a3128, 2.8));
   scene.add(new THREE.AmbientLight(0x404a5e, 0.9));
-  const sun = new THREE.DirectionalLight(0xfff1dc, 3.2);
+  const sun = new THREE.DirectionalLight(0xfff1dc, 2.1);
   sun.position.set(18, 30, 12);
   sun.castShadow = true;
-  const half = Math.max(arena.width, arena.depth) * 0.75;
+  // tight shadow frustum = more texels per metre = less acne on wall faces
+  const half = Math.max(arena.width, arena.depth) * 0.55;
   sun.shadow.camera.left = -half; sun.shadow.camera.right = half;
   sun.shadow.camera.top = half; sun.shadow.camera.bottom = -half;
   sun.shadow.camera.near = 1; sun.shadow.camera.far = 120;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.bias = -0.0008;
+  sun.shadow.bias = -0.0003;
+  // normalBias pushes the lookup along the surface normal: the standard cure for striped self-shadowing
+  // on faces lit at grazing angles (the "messy texture" on wall sides in the 2026-09-13 playtest)
+  sun.shadow.normalBias = 0.08;
   scene.add(sun);
 
   const floor = new THREE.Mesh(
@@ -68,9 +73,10 @@ export function createScene(container: HTMLElement, arena: Arena): SceneBundle {
     const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
     edges.position.copy(mesh.position);
     scene.add(edges);
-    // a thin light strip along the top of every wall: reads as a silhouette even in shadow
+    // a thin light strip along the top of every wall: reads as a silhouette even in shadow.
+    // It sits ON the wall (bottom sunk 1 cm in, top 5 cm above) so no face is coplanar with the wall top.
     const strip = new THREE.Mesh(new THREE.BoxGeometry(sx + 0.02, 0.06, sz + 0.02), stripMat);
-    strip.position.set(mesh.position.x, CFG.wallHeight - 0.03, mesh.position.z);
+    strip.position.set(mesh.position.x, CFG.wallHeight + 0.02, mesh.position.z);
     scene.add(strip);
   }
 

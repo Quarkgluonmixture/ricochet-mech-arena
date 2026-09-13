@@ -95,12 +95,11 @@ export function stepMech(m: Mech, input: MechInput, dt: number, walls: Aabb[]): 
   const r = stepMotion(m, input.move, input.dash, dt, walls);
   m.torsoYaw = input.torsoYaw;
   m.fireCd = Math.max(0, m.fireCd - dt);
+  // legs face the movement direction; standing still, they turn in place to face the torso
   const speed = len(m.vel);
-  if (speed > 0.5) {
-    const target = yawOf(m.vel);
-    const d = angleDiff(m.legsYaw, target);
-    const step = CFG.mech.legsTurnRate * dt;
-    m.legsYaw += Math.abs(d) < step ? d : Math.sign(d) * step;
-  }
+  const target = speed > 0.5 ? yawOf(m.vel) : m.torsoYaw;
+  const d = angleDiff(m.legsYaw, target);
+  const step = CFG.mech.legsTurnRate * dt;
+  m.legsYaw += Math.abs(d) < step ? d : Math.sign(d) * step;
   return { dashed: r.dashed };
 }
