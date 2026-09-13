@@ -57,7 +57,12 @@ html, body { margin: 0; height: 100%; background: #0b0e14; color: var(--ink); ov
 #hud.spectate #ai-debug { font-size: 13px; }
 
 /* ---------- menu ---------- */
-:root { --display: 'Chakra Petch', ui-sans-serif, system-ui, sans-serif; --ui: 'Rajdhani', ui-sans-serif, system-ui, sans-serif; }
+:root { --display: 'Chakra Petch', ui-sans-serif, system-ui, sans-serif; --ui: 'Rajdhani', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', ui-sans-serif, system-ui, sans-serif; }
+/* Chinese: the condensed Latin UI face has no CJK glyphs, so tracking that looks right on Latin looks scattered on hanzi */
+body.zh .brand .eyebrow { letter-spacing: 0.3em; }
+body.zh .menu-list .item { letter-spacing: 0.12em; font-size: 28px; }
+body.zh .keys, body.zh .foot, body.zh .panel label { letter-spacing: 0.08em; }
+body.zh .brand .lede { line-height: 1.7; }
 #overlay { position: absolute; inset: 0; overflow: hidden; background: linear-gradient(90deg, rgba(5,7,11,0.95) 0%, rgba(5,7,11,0.86) 36%, rgba(5,7,11,0.38) 64%, rgba(5,7,11,0.18) 100%); }
 #overlay.hidden { display: none; }
 #splash { position: absolute; inset: 0; background: #0b0e14 center / cover no-repeat; opacity: 1; transition: opacity 1.4s ease; }

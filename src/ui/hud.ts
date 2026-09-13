@@ -1,5 +1,6 @@
 import { CFG } from '../sim/config.ts';
 import type { Mech } from '../sim/mech.ts';
+import { t } from './i18n.ts';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -64,14 +65,14 @@ export class Hud {
 
   setOverlay(visible: boolean, inProgress = false): void {
     this.overlay.classList.toggle('hidden', !visible);
-    if (visible) this.playLabel.textContent = inProgress ? 'Resume' : 'Play';
+    if (visible) this.playLabel.textContent = t(inProgress ? 'menu.resume' : 'menu.play');
   }
   get overlayVisible(): boolean { return !this.overlay.classList.contains('hidden'); }
   /** Attract mode: the live AI-vs-AI scene runs behind the menu with the HUD hidden. */
   setAttract(on: boolean): void { this.hud.classList.toggle('attract', on); }
   setSplash(url: string): void { this.splash.style.backgroundImage = `url('${url}')`; }
   hideSplash(): void { this.splash.classList.add('gone'); }
-  setBuild(text: string): void { $('build').textContent = text; }
+  setBuild(date: string): void { $('build').textContent = t('foot.build', { date }); }
   /** Keyboard navigation of the menu list. */
   menuMove(dir: 1 | -1): void {
     const i = this.items.findIndex((b) => b.classList.contains('is-active'));
@@ -83,20 +84,26 @@ export class Hud {
     for (const b of this.items) b.addEventListener('mouseenter', () => this.items.forEach((o) => o.classList.toggle('is-active', o === b)));
   }
   setLoading(loaded: number, total: number): void {
+    this.lastLoaded = loaded; this.lastTotal = total;
     const done = total > 0 && loaded >= total;
     this.loading.classList.toggle('done', done);
     this.loadingBar.style.width = total > 0 ? `${Math.round((loaded / total) * 100)}%` : '0%';
-    this.loadingText.textContent = done ? '' : `Loading ${loaded}/${total}`;
+    this.loadingText.textContent = done ? '' : `${t('menu.loading')} ${loaded}/${total}`;
   }
   showSettings(on: boolean): void { this.settingsPanel.classList.toggle('hidden', !on); }
   setMusicStatus(text: string): void { this.musicStatus.textContent = text; }
   setFps(ms: number | null): void {
     this.fps.classList.toggle('show', ms !== null);
-    if (ms !== null) this.fps.textContent = `${ms.toFixed(1)} ms · ${Math.round(1000 / Math.max(ms, 0.1))} fps`;
+    if (ms !== null) this.fps.textContent = t('fps', { ms: ms.toFixed(1), fps: Math.round(1000 / Math.max(ms, 0.1)) });
   }
 
   setSpectate(on: boolean): void { this.hud.classList.toggle('spectate', on); }
-  setCamMode(mode: string): void { this.camMode.textContent = mode === 'first' ? '1st · V' : '3rd · V'; }
+  private camModeValue = 'first';
+  setCamMode(mode: string): void { this.camModeValue = mode; this.camMode.textContent = t(mode === 'first' ? 'cam.first' : 'cam.third'); }
+  /** Re-render every dynamic label after a language change. */
+  relabel(): void { this.setCamMode(this.camModeValue); this.setLoading(this.lastLoaded, this.lastTotal); }
+  private lastLoaded = 0;
+  private lastTotal = 0;
 
   say(text: string, who: 'you' | 'ai', hint = '', seconds = 2.2): void {
     this.banner.textContent = text;
@@ -115,11 +122,11 @@ export class Hud {
     const frac = ready ? 1 : 1 - player.dashCd / CFG.mech.dashCooldown;
     this.dashFill.style.transform = `scaleX(${frac.toFixed(3)})`;
     this.dash.classList.toggle('ready', ready);
-    const red = ai.alive && aiTotal > 0 ? `${aiSafe}/${aiTotal}${aiSafe === 0 ? ' trapped' : ''}` : '—';
+    const red = ai.alive && aiTotal > 0 ? `${aiSafe}/${aiTotal}${aiSafe === 0 ? t('hud.safeTrapped') : ''}` : t('hud.safeDash');
     if (blue) {
-      const b = player.alive && blue.total > 0 ? `${blue.safe}/${blue.total}${blue.safe === 0 ? ' trapped' : ''}` : '—';
-      this.aiDebug.textContent = `BLUE safe moves ${b}   ·   RED safe moves ${red}`;
-    } else this.aiDebug.textContent = ai.alive && aiTotal > 0 ? `AI safe moves ${red}` : '';
+      const b = player.alive && blue.total > 0 ? `${blue.safe}/${blue.total}${blue.safe === 0 ? t('hud.safeTrapped') : ''}` : t('hud.safeDash');
+      this.aiDebug.textContent = t('hud.safeBoth', { b, r: red });
+    } else this.aiDebug.textContent = ai.alive && aiTotal > 0 ? t('hud.aiSafe', { n: aiSafe, total: aiTotal }) + (aiSafe === 0 ? t('hud.trapped') : '') : '';
     if (this.bannerTimer > 0) {
       this.bannerTimer -= dt;
       if (this.bannerTimer <= 0) { this.banner.className = ''; this.hint.className = ''; }

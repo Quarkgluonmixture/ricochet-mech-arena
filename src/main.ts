@@ -16,6 +16,7 @@ import { SpectatorCamera } from './render/spectator.ts';
 import { GroundTrail } from './render/trail.ts';
 import { Audio } from './ui/audio.ts';
 import { Hud } from './ui/hud.ts';
+import { setLang, t } from './ui/i18n.ts';
 import { Radar } from './ui/radar.ts';
 import { loadSettings, saveSettings } from './ui/settings.ts';
 import { ThreatRing } from './ui/threat.ts';
@@ -33,6 +34,7 @@ const blueState: AiState = makeAiState(player.torsoYaw);
 
 // ---- render + ui ----------------------------------------------------------------------------
 const settings = loadSettings();
+setLang(settings.lang);
 const view = document.getElementById('view') as HTMLElement;
 const { renderer, scene, camera, render, setQuality, update: updateScene } = createScene(view, arena, settings.quality);
 const playerView = new MechView(scene, COLORS.you);
@@ -52,7 +54,8 @@ const audio = new Audio();
 audio.setVolumes(settings.sfx, settings.music);
 hud.setCamMode(rig.mode);
 hud.setSplash(TEX.keyart);
-hud.setBuild(`build ${__BUILD__}`);
+hud.setBuild(__BUILD__);
+hud.setMusicStatus(t('music.none'));
 hud.menuHoverSync();
 
 // ---- modes ----------------------------------------------------------------------------------
@@ -136,6 +139,17 @@ const loadingTick = setInterval(() => {
   if (audio.ready) { clearInterval(loadingTick); window.clearTimeout(splashTimer); window.setTimeout(() => hud.hideSplash(), 400); }
 }, 100);
 
+const setLangSel = $<HTMLSelectElement>('set-lang');
+setLangSel.value = settings.lang;
+setLangSel.addEventListener('change', () => {
+  settings.lang = setLangSel.value as typeof settings.lang;
+  setLang(settings.lang);
+  hud.relabel();
+  hud.setOverlay(hud.overlayVisible, gameStarted);
+  hud.setMusicStatus(audio.currentTrack ? t('music.track', { name: audio.currentTrack.split('/').pop() ?? '' }) : t('music.none'));
+  audio.ui('switch');
+  saveSettings(settings);
+});
 const setQ = $<HTMLSelectElement>('set-quality');
 const setSfx = $<HTMLInputElement>('set-sfx');
 const setMusic = $<HTMLInputElement>('set-music');
@@ -168,11 +182,11 @@ let musicPhase: 'none' | 'menu' | 'game' = 'none';
 async function music(phase: 'menu' | 'game'): Promise<void> {
   if (musicPhase === phase) return;
   musicPhase = phase;
-  const t = phase === 'game' ? MUSIC.game : MUSIC.menu;
-  const ok = await audio.playTrack(t.url, 2, { start: t.start, loopStart: t.loopStart });
+  const track = phase === 'game' ? MUSIC.game : MUSIC.menu;
+  const ok = await audio.playTrack(track.url, 2, { start: track.start, loopStart: track.loopStart });
   if (!ok && phase === 'game') { /* no game track: keep whatever is playing (menu track or silence) */ }
   const cur = audio.currentTrack;
-  hud.setMusicStatus(cur ? `music · ${cur.split('/').pop()}` : 'music · none');
+  hud.setMusicStatus(cur ? t('music.track', { name: cur.split('/').pop() ?? '' }) : t('music.none'));
 }
 // the first gesture anywhere unlocks audio and starts the menu track (browsers block earlier starts)
 const firstGesture = () => { audio.unlock(); if (musicPhase === 'none') void music('menu'); };
@@ -256,9 +270,9 @@ function bearingWord(vel: Vec2): string {
   const f = forward(player.torsoYaw), r = right(player.torsoYaw);
   const a = Math.atan2(from.x * r.x + from.z * r.z, from.x * f.x + from.z * f.z);
   const deg = (a * 180) / Math.PI;
-  if (Math.abs(deg) < 45) return 'the front';
-  if (Math.abs(deg) > 135) return 'behind';
-  return deg > 0 ? 'the right' : 'the left';
+  if (Math.abs(deg) < 45) return t('dir.front');
+  if (Math.abs(deg) > 135) return t('dir.behind');
+  return t(deg > 0 ? 'dir.right' : 'dir.left');
 }
 
 const stats = { fires: [0, 0], bounces: 0, hits: 0, selfHits: 0 };
@@ -289,7 +303,8 @@ function handleEvents(): void {
             rig.hurt();
             audio.damage(e.hpLeft === 1);
             hud.setLives(player.hp, player.hpMax);
-            hud.say('', 'ai', e.hpLeft === 1 ? `Last life. ${e.bounces > 0 ? `Bank shot from ${bearingWord(e.vel)}.` : 'Direct hit.'}` : `${e.hpLeft} lives left. ${e.bounces > 0 ? `Bank shot from ${bearingWord(e.vel)}.` : 'Direct hit.'}`, 1.6);
+            const how = e.bounces > 0 ? t('h.bankFrom', { dir: bearingWord(e.vel) }) : t('h.direct');
+            hud.say('', 'ai', e.hpLeft === 1 ? t('h.lastLife', { how }) : t('h.livesLeft', { n: e.hpLeft, how }), 1.6);
           }
           break;
         }
@@ -298,15 +313,15 @@ function handleEvents(): void {
         if (attract) break;
         if (spectating) {
           const own = e.shooter === e.victim;
-          const how = own ? 'Its own ricochet came back.' : e.bounces > 0 ? `Bank shot from ${bearingWord(e.vel)}.` : 'Direct hit.';
+          const how = own ? t('h.itsOwnRicochetBack') : e.bounces > 0 ? t('h.bankFrom', { dir: bearingWord(e.vel) }) : t('h.direct');
           const victimBlue = e.victim === player.id;
-          hud.say(own ? `${victimBlue ? 'BLUE' : 'RED'} OWN GOAL` : victimBlue ? 'RED SCORES' : 'BLUE SCORES', victimBlue ? 'ai' : 'you', how);
+          hud.say(t(own ? (victimBlue ? 'b.blueOwnGoal' : 'b.redOwnGoal') : victimBlue ? 'b.redScores' : 'b.blueScores'), victimBlue ? 'ai' : 'you', how);
         } else if (e.victim === player.id) {
-          if (e.shooter === player.id) hud.say('OWN GOAL', 'ai', 'Your own ricochet came back.');
-          else hud.say('HIT', 'ai', e.bounces > 0 ? `Bank shot from ${bearingWord(e.vel)}.` : 'Direct hit. Keep moving.');
+          if (e.shooter === player.id) hud.say(t('b.ownGoal'), 'ai', t('h.ownRicochet'));
+          else hud.say(t('b.hit'), 'ai', e.bounces > 0 ? t('h.bankFrom', { dir: bearingWord(e.vel) }) : t('h.directKeepMoving'));
         } else if (e.shooter === player.id) {
-          hud.say('KILL', 'you', e.bounces > 0 ? 'Bank shot. It never saw it coming.' : 'Cornered. It had nowhere left to go.');
-        } else hud.say('IT SHOT ITSELF', 'you', 'Its own ricochet.');
+          hud.say(t('b.kill'), 'you', e.bounces > 0 ? t('h.bankNeverSaw') : t('h.cornered'));
+        } else hud.say(t('b.itShotItself'), 'you', t('h.itsOwnRicochet'));
         break;
       }
       case 'round':

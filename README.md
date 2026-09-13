@@ -86,6 +86,7 @@ self-hosted Chakra Petch and Rajdhani (OFL, `public/fonts/CREDITS.txt`). Setting
 
 | Setting | What it changes |
 |---|---|
+| Language | Chinese (default) or English; every menu, settings and HUD string comes from `src/ui/i18n.ts`. |
 | Quality | Low: no bloom, no shadows, 1x pixels. Medium (default): 1.25x pixels, 2x MSAA, bloom, 1024 shadows, 4 shell lights. High: full Retina, 4x MSAA, 2048 shadows, 6 shell lights. |
 | Effects / Music | Bus volumes. |
 | Mouse | Sensitivity multiplier. |
