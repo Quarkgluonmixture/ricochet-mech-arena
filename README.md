@@ -26,6 +26,9 @@ npm run build    # tsc + vite → dist/
 | V | first ↔ third person |
 | R | reset the round |
 | Esc | release the mouse |
+| T | **watch AI vs AI**: both mechs run the same brain; drag to orbit, wheel to zoom, V for top-down, Esc back |
+
+Open `?spectate` in the URL to start in spectator mode.
 
 ## Rules (M0)
 
@@ -50,6 +53,13 @@ npm run build    # tsc + vite → dist/
 - No external assets: mechs are primitives, sounds are synthesised (fire, bounce, hit, dash, and a
   per-shell hum positioned by bearing and distance).
 
+## Spectator mode
+
+Both mechs get 4 shells and a 0.5 s cooldown so there is enough in the air to weave around. The director
+camera stands off the line between them and pulls back as they separate; the top-down camera shows the
+whole maze. The readout at the top right shows how many of each mech's 17 candidate moves are currently
+safe — when it hits 0 it is trapped.
+
 ## How the AI works
 
 Every 80 ms it predicts each live shell's path over 1.5 s using the same `advanceShell` the world uses,
@@ -58,7 +68,9 @@ ones that never come within reach of a shell. Safe moves are scored by engagemen
 wall contact (it dislikes corners), and smoothness; if none is safe and the dash is ready it re-runs the
 candidates with a dash. Offence: a direct shot if the lead point is clear, otherwise a one-bounce solution
 via mirror images across every wall face, choosing the one closest to where the torso already points so
-it actually gets to fire against a moving target. It never reads your inputs.
+it actually gets to fire against a moving target. With a solution and nothing incoming it settles to
+shoot; without one for more than 0.8 s it hunts for an angle instead of standing where a zero-width line
+of sight exists but no shell-width shot does. It never reads your inputs.
 
 ## Verified 2026-09-13 (headless Chromium, scripted player)
 
@@ -69,8 +81,9 @@ it actually gets to fire against a moving target. It never reads your inputs.
   never exceeds the speed cap; a bank-shot solution flown with the real shell model arrives after
   exactly one bounce; a shell that arrives after the round is decided cannot hit the survivor; shells
   fired against or 1 m off a wall bounce instead of tunnelling.
-- With the body-coupled torso (same duel, 15 s): 3–4 AI shots, first kill at 10.8 s; before it, 7 shots
+- With the body-coupled torso (same duel, 15 s): 5 AI shots, first kill at 13.3 s; before it, 7 shots
   in 20 s and a kill at 1.6 s. The AI is deliberately less of a turret now.
+- AI vs AI, 90 s: 106 and 105 shots, 3 rounds, both sides trapped (0 safe moves) at some point.
 
 ## Layout
 

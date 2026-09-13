@@ -69,4 +69,7 @@ export const CFG = {
   },
 
   round: { respawnDelay: 2.0 },
+
+  /** AI-vs-AI spectator mode: both mechs get these, so the duel has enough shells in the air to weave. */
+  spectate: { maxShells: 4, fireCooldown: 0.5 },
 };

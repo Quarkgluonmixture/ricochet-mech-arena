@@ -25,12 +25,15 @@ export interface AiState {
   lastLegsYaw: number;
   round: number;
   solution: FireSolution | null;
+  /** Seconds since it last had a firing solution. Past a threshold it hunts for an angle instead of
+   *  standing where a zero-width line of sight exists but no shell-width shot does (the AI-vs-AI deadlock). */
+  noSolutionT: number;
   /** Diagnostics for the HUD / tests. */
   lastSafe: number;
   lastCandidates: number;
 }
 
-export const makeAiState = (yaw = 0): AiState => ({ replanT: 0, move: { x: 0, z: 0 }, dash: false, torsoYaw: yaw, lastLegsYaw: yaw, round: -1, solution: null, lastSafe: 0, lastCandidates: 0 });
+export const makeAiState = (yaw = 0): AiState => ({ replanT: 0, move: { x: 0, z: 0 }, dash: false, torsoYaw: yaw, lastLegsYaw: yaw, round: -1, solution: null, noSolutionT: 0, lastSafe: 0, lastCandidates: 0 });
 
 /** Where the target will be when a shell fired now over `pathLen` metres arrives. Two fixed-point iterations. */
 function leadPoint(from: Vec2, target: Mech, speed: number): Vec2 {
@@ -110,7 +113,7 @@ interface Candidate { move: Vec2; dash: boolean }
  * shell's predicted path over the horizon. Safe candidates are scored by range band, line of sight,
  * wall contact (corners are where it dies) and smoothness; unsafe ones by how late they get hit.
  */
-export function planMove(world: World, self: Mech, target: Mech, st: AiState): { move: Vec2; dash: boolean; safe: number; total: number } {
+export function planMove(world: World, self: Mech, target: Mech, st: AiState, wantsToShoot = false): { move: Vec2; dash: boolean; safe: number; total: number } {
   const A = CFG.ai;
   const dt = A.predictDt;
   const steps = Math.ceil(A.horizon / dt);
@@ -124,6 +127,7 @@ export function planMove(world: World, self: Mech, target: Mech, st: AiState): {
     paths.push(predictPath(s, world.shellWalls, A.horizon, dt));
   }
 
+  const hunting = st.noSolutionT > 0.8;
   const cands: Candidate[] = [{ move: { x: 0, z: 0 }, dash: false }];
   for (let i = 0; i < A.dirs; i++) {
     const a = (i / A.dirs) * Math.PI * 2;
@@ -150,7 +154,12 @@ export function planMove(world: World, self: Mech, target: Mech, st: AiState): {
       const d = dist(m.pos, target.pos);
       const rangePen = d < A.minRange ? (A.minRange - d) : d > A.maxRange ? (d - A.maxRange) : 0;
       score -= rangePen * 0.6;
-      if (segmentClear(m.pos, target.pos, world.walls)) score += 2;
+      // line of fire, not line of sight: judged with the shell-width walls the solver uses
+      if (segmentClear(m.pos, target.pos, world.shellWalls)) score += 2;
+      // settle to shoot: a torso that is being dragged around by the legs never lines up
+      if (wantsToShoot && paths.length === 0 && len(c.move) < 0.01) score += 1.5;
+      // no shot for a while: standing still is the one thing that cannot fix that
+      if (hunting) { if (len(c.move) < 0.01) score -= 1.5; score -= d * 0.15; }
       score -= contacts * 0.05;
       score -= len(sub(c.move, st.move)) * 0.4;
       if (c.dash) score -= 3; // dashes are precious; spend them only when nothing else is safe
@@ -190,17 +199,20 @@ export function aiThink(world: World, self: Mech, target: Mech, st: AiState, dt:
   st.replanT -= dt;
   if (st.replanT <= 0) {
     st.replanT = CFG.ai.replanInterval;
-    const plan = planMove(world, self, target, st);
+    const plan = planMove(world, self, target, st, live && st.solution !== null && self.shellsOut < self.maxShells);
     st.move = plan.move;
     st.dash = plan.dash;
     st.lastSafe = plan.safe;
     st.lastCandidates = plan.total;
     st.solution = live ? findFireSolution(self, target, world.shellWalls, CFG.shell.speed, st.torsoYaw) : null;
+    st.noSolutionT = st.solution ? 0 : st.noSolutionT + CFG.ai.replanInterval;
   }
   // Torso model (AI only; the player's mouse is free):
   // 1. the torso rides on the legs — whatever the body turned since last frame, the torso turns too;
   if (st.round !== world.round) { st.round = world.round; st.torsoYaw = self.torsoYaw; st.lastLegsYaw = self.legsYaw; }
-  st.torsoYaw += angleDiff(st.lastLegsYaw, self.legsYaw);
+  //    (only while moving: standing still the legs turn towards the torso, and dragging the torso by
+  //    that would make the two chase each other round in circles)
+  if (len(self.vel) > 0.5) st.torsoYaw += angleDiff(st.lastLegsYaw, self.legsYaw);
   st.lastLegsYaw = self.legsYaw;
   // 2. then it slews back towards the aim at a bounded rate;
   const wantYaw = st.solution ? yawOf(st.solution.dir) : yawOf(sub(target.pos, self.pos));

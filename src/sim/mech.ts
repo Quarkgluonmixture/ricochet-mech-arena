@@ -24,6 +24,8 @@ export interface Mech {
   dashCd: number;
   dashDir: Vec2;
   fireCd: number;
+  /** Seconds between shots for THIS mech (set by role; spectator mode overrides both). */
+  fireCooldown: number;
   maxShells: number;
   shellsOut: number;
   kills: number;
@@ -40,6 +42,7 @@ export function makeMech(id: number, name: string, isPlayer: boolean, pos: Vec2,
     alive: true, radius: CFG.mech.radius,
     dashT: 0, dashCd: 0, dashDir: { x: 0, z: 0 },
     fireCd: 0,
+    fireCooldown: isPlayer ? CFG.player.fireCooldown : CFG.ai.fireCooldown,
     maxShells: isPlayer ? CFG.player.maxShells : CFG.ai.maxShells,
     shellsOut: 0, kills: 0, deaths: 0,
     moveIntent: { x: 0, z: 0 },

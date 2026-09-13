@@ -5,6 +5,7 @@ import type { Mech } from '../sim/mech.ts';
 export class HeadMarker {
   private mesh: THREE.Mesh;
   private spin = 0;
+  private enabled = true;
 
   constructor(scene: THREE.Scene, color: number) {
     const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, depthTest: false, depthWrite: false });
@@ -14,9 +15,11 @@ export class HeadMarker {
     scene.add(this.mesh);
   }
 
+  setVisible(v: boolean): void { this.enabled = v; }
+
   update(m: Mech, camera: THREE.Camera, dt: number): void {
-    this.mesh.visible = m.alive;
-    if (!m.alive) return;
+    this.mesh.visible = m.alive && this.enabled;
+    if (!this.mesh.visible) return;
     this.spin += dt * 2.2;
     this.mesh.position.set(m.pos.x, 2.75 + Math.sin(this.spin * 2) * 0.06, m.pos.z);
     const d = camera.position.distanceTo(this.mesh.position);

@@ -35,6 +35,7 @@ export class CameraRig {
   }
 
   kick(): void { this.recoil = 1; this.shake = 1; }
+  setViewmodelVisible(v: boolean): void { this.viewmodel.visible = v; }
 
   toggle(): CamMode {
     this.mode = this.mode === 'first' ? 'third' : 'first';

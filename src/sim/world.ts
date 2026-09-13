@@ -106,7 +106,7 @@ export class World {
     };
     this.shells.push(s);
     m.shellsOut++;
-    m.fireCd = m.isPlayer ? CFG.player.fireCooldown : CFG.ai.fireCooldown;
+    m.fireCd = m.fireCooldown;
     this.events.push({ kind: 'fire', pos: { ...muzzle }, mech: m.id });
   }
 

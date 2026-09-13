@@ -19,6 +19,7 @@ export class Hud {
   private aiDebug = $('ai-debug');
   private camMode = $('cam-mode');
   private overlay = $('overlay');
+  private hud = $('hud');
   private bannerTimer = 0;
   private pips: HTMLElement[] = [];
 
@@ -31,6 +32,7 @@ export class Hud {
   }
 
   setOverlay(visible: boolean): void { this.overlay.classList.toggle('hidden', !visible); }
+  setSpectate(on: boolean): void { this.hud.classList.toggle('spectate', on); }
   setCamMode(mode: string): void { this.camMode.textContent = mode === 'first' ? '1st · V' : '3rd · V'; }
 
   say(text: string, who: 'you' | 'ai', hint = '', seconds = 2.2): void {
@@ -41,7 +43,7 @@ export class Hud {
     this.bannerTimer = seconds;
   }
 
-  update(player: Mech, ai: Mech, aiSafe: number, aiTotal: number, dt: number): void {
+  update(player: Mech, ai: Mech, aiSafe: number, aiTotal: number, dt: number, blue?: { safe: number; total: number }): void {
     this.scoreYou.textContent = String(player.kills);
     this.scoreAi.textContent = String(ai.kills);
     const available = player.maxShells - player.shellsOut;
@@ -50,7 +52,11 @@ export class Hud {
     const frac = ready ? 1 : 1 - player.dashCd / CFG.mech.dashCooldown;
     this.dashFill.style.transform = `scaleX(${frac.toFixed(3)})`;
     this.dash.classList.toggle('ready', ready);
-    this.aiDebug.textContent = ai.alive && aiTotal > 0 ? `AI safe moves ${aiSafe}/${aiTotal}${aiSafe === 0 ? ' — trapped' : ''}` : '';
+    const red = ai.alive && aiTotal > 0 ? `${aiSafe}/${aiTotal}${aiSafe === 0 ? ' trapped' : ''}` : '—';
+    if (blue) {
+      const b = player.alive && blue.total > 0 ? `${blue.safe}/${blue.total}${blue.safe === 0 ? ' trapped' : ''}` : '—';
+      this.aiDebug.textContent = `BLUE safe moves ${b}   ·   RED safe moves ${red}`;
+    } else this.aiDebug.textContent = ai.alive && aiTotal > 0 ? `AI safe moves ${red}` : '';
     if (this.bannerTimer > 0) {
       this.bannerTimer -= dt;
       if (this.bannerTimer <= 0) { this.banner.className = ''; this.hint.className = ''; }

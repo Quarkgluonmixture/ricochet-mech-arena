@@ -38,6 +38,11 @@ html, body { margin: 0; height: 100%; background: #0b0e14; color: var(--ink); ov
 #hint.show { opacity: 0.95; }
 #ai-debug { position: absolute; right: 18px; top: 18px; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; text-align: right; line-height: 1.5; }
 #cam-mode { position: absolute; right: 18px; bottom: 18px; font-size: 12px; color: var(--dim); }
+#spec-help { position: absolute; bottom: 22px; left: 0; right: 0; text-align: center; font-size: 13px; color: var(--dim); display: none; }
+#spec-help b { color: var(--ink); }
+#hud.spectate #crosshair, #hud.spectate #threat, #hud.spectate #radar, #hud.spectate #status, #hud.spectate #cam-mode { display: none; }
+#hud.spectate #spec-help { display: block; }
+#hud.spectate #ai-debug { font-size: 13px; }
 
 #overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(6, 8, 12, 0.72); backdrop-filter: blur(3px); }
 #overlay.hidden { display: none; }
@@ -46,8 +51,10 @@ html, body { margin: 0; height: 100%; background: #0b0e14; color: var(--ink); ov
 #overlay .lede { color: var(--dim); font-size: 15px; line-height: 1.5; margin: 0 0 18px; }
 #overlay ul { list-style: none; padding: 0; margin: 0 0 22px; color: var(--dim); font-size: 14px; line-height: 1.9; }
 #overlay b { color: var(--ink); }
-#play { font: inherit; font-size: 16px; font-weight: 600; padding: 12px 22px; border-radius: 10px; border: 0; background: var(--you); color: #08111e; cursor: pointer; }
-#play:hover { filter: brightness(1.1); }
+#overlay .buttons { display: flex; gap: 10px; }
+#play, #watch { font: inherit; font-size: 16px; font-weight: 600; padding: 12px 22px; border-radius: 10px; border: 0; background: var(--you); color: #08111e; cursor: pointer; }
+#watch.secondary { background: rgba(255,255,255,0.1); color: var(--ink); border: 1px solid rgba(255,255,255,0.18); }
+#play:hover, #watch:hover { filter: brightness(1.1); }
 
 @media (max-width: 720px) {
   #radar { width: 150px; height: 150px; }
