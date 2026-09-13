@@ -24,8 +24,8 @@ html, body { margin: 0; height: 100%; background: #0b0e14; color: var(--ink); ov
 #score .vs { color: var(--dim); font-weight: 400; }
 
 #status { position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; }
-#lives { display: flex; gap: 8px; margin-bottom: 2px; }
-#lives i { width: 30px; height: 8px; border-radius: 2px; background: #9cf2c9; box-shadow: 0 0 10px rgba(156,242,201,0.7); transition: transform 0.25s, opacity 0.25s, background 0.25s; }
+#lives { position: absolute; right: 18px; top: 16px; display: flex; gap: 8px; }
+#lives i { width: 34px; height: 10px; border-radius: 2px; background: #9cf2c9; box-shadow: 0 0 10px rgba(156,242,201,0.7); transition: transform 0.25s, opacity 0.25s, background 0.25s; }
 #lives i.lost { background: transparent; box-shadow: none; border: 1px solid rgba(255,255,255,0.22); transform: scaleX(0.6); opacity: 0.6; }
 #lives.last i:not(.lost) { background: var(--ai); box-shadow: 0 0 12px var(--ai); animation: pulse 0.9s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
@@ -48,7 +48,8 @@ html, body { margin: 0; height: 100%; background: #0b0e14; color: var(--ink); ov
 #banner.ai { color: var(--ai); }
 #hint { position: absolute; top: calc(34% + 74px); left: 0; right: 0; text-align: center; font-size: 17px; color: var(--ink); opacity: 0; transition: opacity 0.25s; text-shadow: 0 1px 8px rgba(0,0,0,0.8); }
 #hint.show { opacity: 0.95; }
-#ai-debug { position: absolute; right: 18px; top: 18px; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; text-align: right; line-height: 1.5; }
+#ai-debug { position: absolute; right: 18px; top: 40px; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; text-align: right; line-height: 1.5; }
+#hud.spectate #ai-debug { top: 18px; }
 #cam-mode { position: absolute; right: 18px; bottom: 18px; font-size: 12px; color: var(--dim); }
 #feed { position: absolute; left: 18px; top: 18px; display: flex; flex-direction: column; gap: 5px; font: 500 13px var(--ui); letter-spacing: 0.06em; }
 #feed div { padding: 4px 10px; background: rgba(8,11,17,0.55); border-left: 2px solid rgba(255,255,255,0.25); border-radius: 3px; animation: feedin 0.2s ease-out, feedout 0.6s ease-in 3.6s forwards; }

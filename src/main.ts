@@ -119,6 +119,7 @@ function applyRosterLimits(): void {
 function setAttract(on: boolean): void {
   if (attract === on) return;
   attract = on;
+  if (on) ensureRoster('eve');
   hud.setAttract(on);
   spec.autoOrbit = on ? 0.05 : 0;
   rig.setViewmodelVisible(!on);
@@ -136,6 +137,8 @@ function setSpectate(on: boolean): void {
     setAttract(false);
     if (document.pointerLockElement) document.exitPointerLock();
     hud.setOverlay(false);
+    gameStarted = false; // watching ends the human duel; Play starts a fresh one
+    ensureRoster('eve');
     spec.reset();
     for (const s of slots) s.state.round = -1;
     rig.setViewmodelVisible(false);
@@ -150,7 +153,13 @@ function setSpectate(on: boolean): void {
   applyDuck();
 }
 
-buildRoster(settings.matchSize);
+/** PvE is always the duel; the match-size setting is for AI-vs-AI (attract, spectate) only. */
+function rosterFor(mode: 'pve' | 'eve'): number { return mode === 'pve' ? 1 : settings.matchSize; }
+function ensureRoster(mode: 'pve' | 'eve'): void {
+  const want = rosterFor(mode) * 2;
+  if (world.mechs.length !== want) buildRoster(rosterFor(mode));
+}
+buildRoster(rosterFor('eve'));
 
 // ---- start screen: preload, settings, music -------------------------------------------------
 void audio.preload();
@@ -183,12 +192,12 @@ setMatch.addEventListener('change', () => {
   settings.matchSize = Number(setMatch.value) as 1 | 2 | 3;
   saveSettings(settings);
   audio.ui('switch');
-  // a new roster is a new match
+  // the EvE roster changed: rebuild the AI-vs-AI scene behind the menu (PvE stays the duel)
   if (spectating) setSpectate(false);
   gameStarted = false;
-  buildRoster(settings.matchSize);
+  buildRoster(rosterFor('eve'));
   for (const s of slots) s.state.round = -1;
-  setAttract(true);
+  if (!attract) setAttract(true);
   refreshMenuText();
 });
 const setQ = $<HTMLSelectElement>('set-quality');
@@ -289,7 +298,7 @@ const play = () => {
   audio.ui('confirm');
   void music('game');
   setAttract(false);
-  if (!gameStarted) { world.resetMatch(); yaw = player.torsoYaw; rig.pitch = 0; gameStarted = true; hud.clearFeed(); }
+  if (!gameStarted) { ensureRoster('pve'); world.resetMatch(); yaw = player.torsoYaw; rig.pitch = 0; gameStarted = true; hud.clearFeed(); applyRosterLimits(); applyLives(); }
   renderer.domElement.requestPointerLock();
 };
 $('play').addEventListener('click', play);
@@ -401,7 +410,8 @@ let fpsTimer = 0;
 function simStep(input: MechInput | null): void {
   const inputs = world.mechs.map((m) => {
     if (m.isPlayer && !aiVsAi()) return input;
-    const target = pickTarget(world, m) ?? world.mechs.find((o) => o.team !== m.team) ?? m;
+    const mateTargets = world.matesOf(m).map((o) => slots[o.id].state.targetId).filter((id) => id >= 0);
+    const target = pickTarget(world, m, mateTargets) ?? world.mechs.find((o) => o.team !== m.team) ?? m;
     return aiThink(world, m, target, slots[m.id].state, STEP);
   });
   world.step(STEP, inputs);
@@ -423,8 +433,7 @@ function readout(): string {
     if (total === 0) return t('hud.safeDash');
     return `${min}/${total}${min === 0 ? t('hud.safeTrapped') : ''}`;
   };
-  if (aiVsAi()) return t('hud.teamSafe', { b: fmt('blue'), r: fmt('red') });
-  if (settings.matchSize > 1) return '';
+  if (aiVsAi()) return world.mechs.length > 2 ? t('hud.teamSafe', { b: fmt('blue'), r: fmt('red') }) : t('hud.safeBoth', { b: fmt('blue'), r: fmt('red') });
   const e = world.mechs.find((m) => m.team !== player.team);
   const s = e ? slots[e.id].state : null;
   return e && e.alive && s && s.lastCandidates > 0 ? t('hud.aiSafe', { n: s.lastSafe, total: s.lastCandidates }) + (s.lastSafe === 0 ? t('hud.trapped') : '') : '';
@@ -446,7 +455,7 @@ function frame(now: number): void {
     s.view.update(s.mech, dt);
     if (s.mech.id === player.id) s.view.root.visible = player.alive && !humanFpv;
     s.marker.update(s.mech, camera, dt);
-    s.marker.setVisible(!attract && s.mech.id !== player.id && (s.mech.team !== player.team || settings.matchSize > 1 || spectating));
+    s.marker.setVisible(!attract && s.mech.id !== player.id && (s.mech.team !== player.team || spectating));
     s.trail.update(s.mech, dt);
   }
   shellViews.sync(world.shells);

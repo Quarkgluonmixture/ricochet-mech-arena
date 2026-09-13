@@ -28,12 +28,14 @@ export interface AiState {
   /** Seconds since it last had a firing solution. Past a threshold it hunts for an angle instead of
    *  standing where a zero-width line of sight exists but no shell-width shot does (the AI-vs-AI deadlock). */
   noSolutionT: number;
+  /** Enemy this mech is engaging (for teammates' focus-fire decisions). */
+  targetId: number;
   /** Diagnostics for the HUD / tests. */
   lastSafe: number;
   lastCandidates: number;
 }
 
-export const makeAiState = (yaw = 0): AiState => ({ replanT: 0, move: { x: 0, z: 0 }, dash: false, torsoYaw: yaw, lastLegsYaw: yaw, round: -1, solution: null, noSolutionT: 0, lastSafe: 0, lastCandidates: 0 });
+export const makeAiState = (yaw = 0): AiState => ({ replanT: 0, move: { x: 0, z: 0 }, dash: false, torsoYaw: yaw, lastLegsYaw: yaw, round: -1, solution: null, noSolutionT: 0, targetId: -1, lastSafe: 0, lastCandidates: 0 });
 
 /** Where the target will be when a shell fired now over `pathLen` metres arrives. Two fixed-point iterations. */
 function leadPoint(from: Vec2, target: Mech, speed: number): Vec2 {
@@ -111,13 +113,18 @@ export function findFireSolution(self: Mech, target: Mech, shellWalls: Aabb[], s
 
 interface Candidate { move: Vec2; dash: boolean }
 
-/** Which enemy to fight: the nearest one, with a strong preference for one there is a line of fire to. */
-export function pickTarget(world: World, self: Mech): Mech | null {
+/**
+ * Which enemy to fight: the nearest one, with a strong preference for a line of fire, and a pull towards
+ * the enemy a teammate is already on. Two shooters on one dodger from two angles is the only thing that
+ * beats a perfect dodge (VISION §4: geometry kills); three shooters on three targets is three duels.
+ */
+export function pickTarget(world: World, self: Mech, mateTargets: Iterable<number> = []): Mech | null {
+  const focused = new Set(mateTargets);
   let best: Mech | null = null;
   let bestScore = Infinity;
   for (const e of world.enemiesOf(self)) {
     const d = dist(self.pos, e.pos);
-    const score = d + (segmentClear(self.pos, e.pos, world.shellWalls) ? 0 : 10);
+    const score = d + (segmentClear(self.pos, e.pos, world.shellWalls) ? 0 : 10) - (focused.has(e.id) ? 6 : 0);
     if (score < bestScore) { bestScore = score; best = e; }
   }
   return best;
@@ -181,6 +188,15 @@ export function planMove(world: World, self: Mech, target: Mech, st: AiState, wa
       if (hunting) { if (len(c.move) < 0.01) score -= 1.5; score -= d * 0.15; }
       // spread out: a mech standing on a teammate blocks its shots and shares every ricochet
       for (const mate of mates) { const md = dist(m.pos, mate.pos); if (md < 3) score -= (3 - md) * 0.8; }
+      // crossfire: reward a bearing to the target that differs from each mate's bearing — the dodger's
+      // safe set is what two shells from 90° apart take away, and one shooter alone never can
+      const myBearing = Math.atan2(target.pos.z - m.pos.z, target.pos.x - m.pos.x);
+      for (const mate of mates) {
+        if (dist(mate.pos, target.pos) > 26) continue;
+        const theirs = Math.atan2(target.pos.z - mate.pos.z, target.pos.x - mate.pos.x);
+        const sep = Math.abs(angleDiff(theirs, myBearing));
+        score += Math.min(1, sep / (Math.PI / 2)) * 1.2;
+      }
       score -= contacts * 0.05;
       score -= len(sub(c.move, st.move)) * 0.4;
       if (c.dash) score -= 3; // dashes are precious; spend them only when nothing else is safe
@@ -225,6 +241,7 @@ export function aiThink(world: World, self: Mech, target: Mech, st: AiState, dt:
     st.dash = plan.dash;
     st.lastSafe = plan.safe;
     st.lastCandidates = plan.total;
+    st.targetId = target.id;
     st.solution = live ? findFireSolution(self, target, world.shellWalls, CFG.shell.speed, st.torsoYaw, world.matesOf(self)) : null;
     st.noSolutionT = st.solution ? 0 : st.noSolutionT + CFG.ai.replanInterval;
   }

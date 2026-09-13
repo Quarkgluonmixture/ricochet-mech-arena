@@ -30,14 +30,17 @@ npm run build    # tsc + vite → dist/
 
 Open `?spectate` in the URL to start in spectator mode.
 
-## Team battle
+## PvE and EvE
 
-Settings → Match: 1v1 duel, 2v2, or 3v3 (default). Your team is blue; you are blue 1, your teammates and all
-of red run the same brain. Friendly fire is on and earns nothing. A round ends when a whole team is down;
-the other team scores. When you die before your team, you watch the rest of the round through the
-director camera. The AI picks the nearest enemy it has a line of fire to, never shoots through a teammate
-(it banks around them instead), and spreads out from its mates. A kill feed at the top left names every
-kill and how it landed. Spawns: `P`/`B` blue, `E`/`R` red in the arena map.
+**Play is always the 1v1 duel** (VISION §1): you against one AI, three lives against its one. **Watch and
+the menu's attract scene are AI vs AI**, and Settings → AI battle picks that roster: 1v1, 2v2 or 3v3
+(default). In a team battle every mech runs the same brain, friendly fire is on and earns nothing, and a
+round ends when a whole team is down. What makes it a contest rather than three duels: teammates
+**focus** the same enemy (a target a mate is already on scores as 6 m closer) and take **crossfire**
+positions (a bearing to the target 90° away from a mate's is rewarded), because two shells from two angles
+remove the dodger's safe moves where one shooter never can. The AI never shoots through a teammate (it banks
+around them), keeps 3 m from mates, and dodges every shell in the air, its own team's included. A kill feed
+at the top left names every kill and how it landed. Spawns: `P`/`B` blue, `E`/`R` red in the arena map.
 
 ## Rules (M0)
 
@@ -98,6 +101,7 @@ self-hosted Chakra Petch and Rajdhani (OFL, `public/fonts/CREDITS.txt`). Setting
 | Setting | What it changes |
 |---|---|
 | Language | Chinese (default) or English; every menu, settings and HUD string comes from `src/ui/i18n.ts`. The Chinese copy was rewritten by Gemini 3.8 Flash (via `agy`) in the register of domestic Chinese games. |
+| AI battle | Roster for Watch and the attract scene only: 1v1, 2v2, 3v3. Play stays 1v1. |
 | Quality | Low: no bloom, no shadows, 1x pixels. Medium (default): 1.25x pixels, 2x MSAA, bloom, 1024 shadows, 4 shell lights. High: full Retina, 4x MSAA, 2048 shadows, 6 shell lights. |
 | Effects / Music | Bus volumes. |
 | Mouse | Sensitivity multiplier. |
