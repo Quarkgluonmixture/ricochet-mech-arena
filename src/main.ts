@@ -34,7 +34,7 @@ const blueState: AiState = makeAiState(player.torsoYaw);
 // ---- render + ui ----------------------------------------------------------------------------
 const settings = loadSettings();
 const view = document.getElementById('view') as HTMLElement;
-const { renderer, scene, camera, render, setQuality } = createScene(view, arena, settings.quality);
+const { renderer, scene, camera, render, setQuality, update: updateScene } = createScene(view, arena, settings.quality);
 const playerView = new MechView(scene, COLORS.you);
 const enemyView = new MechView(scene, COLORS.ai);
 const shellViews = new ShellViews(scene, (owner) => (owner === player.id ? COLORS.you : COLORS.ai), QUALITY[settings.quality].shellLights);
@@ -329,6 +329,7 @@ function frame(now: number): void {
   playerView.root.visible = player.alive && (rig.mode === 'third' || aiVsAi());
   shellViews.sync(world.shells);
   fx.update(dt);
+  updateScene(dt);
   if (aiVsAi()) spec.update(player, enemy, dt); else rig.update(player, dt);
   enemyMarker.update(enemy, camera, dt);
   playerMarker.update(player, camera, dt);

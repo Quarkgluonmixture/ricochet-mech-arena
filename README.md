@@ -60,6 +60,14 @@ Open `?spectate` in the URL to start in spectator mode.
   17 s and the fight from 33 s, so Play or Watch starts it at 17 s once and then loops 33 s → end. Offsets
   live in `MUSIC` in `src/main.ts`. Loops crossfade the last 2.5 s of each pass into the next, so any
   exported song loops without a click or a gap. Music ducks while paused. No file, no music, no error.
+- Mechs: procedural walkers built from bevelled armour slabs over a dark frame, modelled after a concept
+  sheet generated with the Codex image tool (`assets-src/mech-concept.png`): exposed hip and knee joints,
+  a piston behind each shin, an angled chest plate, squared pauldrons with a team stripe, a sensor head with
+  a visor slit, a right-arm cannon with a muzzle brake and heat vents that flare on firing, a left-arm
+  shield, a backpack with two thrusters that light up on a dash. Knees bend and feet stay level in the stride.
+- Scene: the arena stands on a wide dark apron inside a ring of lit pylons; cool and warm rim lights;
+  breathing wall-edge light frames; drifting dust motes; shells are a hot core in an additive plasma halo;
+  a vignette on the HUD layer.
 - Art: six generated images (floor, wall side, wall top, mech hull, hangar sky, key art) made with the
   Codex image tool from the prompts in `assets-src/PROMPTS.md`; originals in `assets-src/`, the JPEGs the
   game loads in `public/textures/` (`scripts/convert-assets.sh`). Textures tile at fixed metric sizes

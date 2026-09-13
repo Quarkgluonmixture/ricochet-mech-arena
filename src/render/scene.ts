@@ -17,6 +17,8 @@ export interface SceneBundle {
   /** Render through the post chain (bloom) or straight, per quality. */
   render: () => void;
   setQuality: (q: Quality) => void;
+  /** Per-frame ambience: pulsing light strips, drifting dust. */
+  update: (dt: number) => void;
 }
 
 export const COLORS = { you: 0x6fb6ff, ai: 0xff6a5c, wall: 0x67728c, wallEdge: 0xb9c7e6, floor: 0x262c3a };
@@ -68,6 +70,13 @@ export function createScene(container: HTMLElement, arena: Arena, quality: Quali
   // kept below 1.0 linear on lit surfaces so only the HDR emissives reach the bloom threshold
   scene.add(new THREE.HemisphereLight(0xc4d2f0, 0x3a3128, 1.5));
   scene.add(new THREE.AmbientLight(0x404a5e, 0.6));
+  // rim lights: a cool one and a warm one from opposite sides, no shadows, so the mechs separate from the floor
+  const rimCool = new THREE.DirectionalLight(0x5aa0ff, 0.7);
+  rimCool.position.set(-30, 12, 24);
+  scene.add(rimCool);
+  const rimWarm = new THREE.DirectionalLight(0xffb070, 0.4);
+  rimWarm.position.set(28, 9, -26);
+  scene.add(rimWarm);
   const sun = new THREE.DirectionalLight(0xfff1dc, 1.3);
   sun.position.set(18, 30, 12);
   sun.castShadow = QUALITY[quality].shadows;
@@ -80,8 +89,15 @@ export function createScene(container: HTMLElement, arena: Arena, quality: Quali
   sun.shadow.normalBias = 0.08;
   scene.add(sun);
 
-  // floor: one texture tile per 4 m arena cell
-  const floorMat = new THREE.MeshStandardMaterial({ color: COLORS.floor, roughness: 0.75, metalness: 0.3 });
+  // apron: the arena stands on a wider dark deck instead of ending at the sky
+  const apron = new THREE.Mesh(new THREE.PlaneGeometry(arena.width + 60, arena.depth + 60), new THREE.MeshStandardMaterial({ color: 0x0d1118, roughness: 0.9, metalness: 0.2 }));
+  apron.rotation.x = -Math.PI / 2;
+  apron.position.y = -0.02;
+  apron.receiveShadow = true;
+  scene.add(apron);
+
+  // floor: one texture tile per 4 m arena cell; a little glossier so the hangar lights reflect in it
+  const floorMat = new THREE.MeshStandardMaterial({ color: COLORS.floor, roughness: 0.55, metalness: 0.35 });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(arena.width, arena.depth), floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
@@ -130,6 +146,63 @@ export function createScene(container: HTMLElement, arena: Arena, quality: Quali
   }
   const strips = new THREE.Mesh(mergeGeometries(stripParts), stripMat);
   scene.add(strips);
+
+  // pylon ring outside the arena: tall dark posts with a vertical light bar, merged into two meshes
+  const pylonParts: THREE.BufferGeometry[] = [];
+  const barParts: THREE.BufferGeometry[] = [];
+  const px = arena.width / 2 + 7, pz = arena.depth / 2 + 7;
+  const step = 10;
+  const ring: Array<[number, number]> = [];
+  for (let x = -px; x <= px + 0.01; x += step) { ring.push([x, -pz]); ring.push([x, pz]); }
+  for (let z = -pz + step; z < pz - 0.01; z += step) { ring.push([-px, z]); ring.push([px, z]); }
+  for (const [x, z] of ring) {
+    const post = new THREE.BoxGeometry(0.7, 8, 0.7); post.translate(x, 4, z); pylonParts.push(post);
+    const cap = new THREE.BoxGeometry(1.1, 0.3, 1.1); cap.translate(x, 8.1, z); pylonParts.push(cap);
+    const towards = Math.atan2(-x, -z); // face the arena centre
+    const bar = new THREE.BoxGeometry(0.12, 5.5, 0.08); bar.translate(0, 4.4, 0.4); bar.rotateY(towards); bar.translate(x, 0, z); barParts.push(bar);
+  }
+  const pylons = new THREE.Mesh(mergeGeometries(pylonParts), new THREE.MeshStandardMaterial({ color: 0x2a3140, roughness: 0.8, metalness: 0.4 }));
+  pylons.castShadow = true;
+  scene.add(pylons);
+  const barMat = new THREE.MeshBasicMaterial({ color: hdr(0x4f8fe0, 1.6) });
+  scene.add(new THREE.Mesh(mergeGeometries(barParts), barMat));
+
+  // dust: a few hundred slow motes in the arena volume, for depth in first person
+  const DUST = 360;
+  const dustPos = new Float32Array(DUST * 3);
+  const dustVel = new Float32Array(DUST * 3);
+  for (let i = 0; i < DUST; i++) {
+    dustPos[i * 3] = (Math.random() - 0.5) * arena.width;
+    dustPos[i * 3 + 1] = 0.3 + Math.random() * 4.5;
+    dustPos[i * 3 + 2] = (Math.random() - 0.5) * arena.depth;
+    dustVel[i * 3] = (Math.random() - 0.5) * 0.12;
+    dustVel[i * 3 + 1] = (Math.random() - 0.5) * 0.05;
+    dustVel[i * 3 + 2] = (Math.random() - 0.5) * 0.12;
+  }
+  const dustGeo = new THREE.BufferGeometry();
+  dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+  const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ color: 0xa9c8ff, size: 0.05, transparent: true, opacity: 0.4, depthWrite: false, sizeAttenuation: true }));
+  dust.frustumCulled = false;
+  scene.add(dust);
+
+  let clock = 0;
+  const stripBase = hdr(0x4f8fe0, 1.0);
+  const update = (dt: number) => {
+    clock += dt;
+    // strips breathe slowly; bars pulse out of phase
+    stripMat.color.copy(stripBase).multiplyScalar(1.9 + 0.35 * Math.sin(clock * 1.6));
+    barMat.color.copy(stripBase).multiplyScalar(1.6 + 0.3 * Math.sin(clock * 1.1 + 1.5));
+    const hw = arena.width / 2, hd = arena.depth / 2;
+    for (let i = 0; i < DUST; i++) {
+      dustPos[i * 3] += dustVel[i * 3] * dt;
+      dustPos[i * 3 + 1] += dustVel[i * 3 + 1] * dt;
+      dustPos[i * 3 + 2] += dustVel[i * 3 + 2] * dt;
+      if (dustPos[i * 3] > hw) dustPos[i * 3] = -hw; else if (dustPos[i * 3] < -hw) dustPos[i * 3] = hw;
+      if (dustPos[i * 3 + 2] > hd) dustPos[i * 3 + 2] = -hd; else if (dustPos[i * 3 + 2] < -hd) dustPos[i * 3 + 2] = hd;
+      if (dustPos[i * 3 + 1] > 4.8) dustPos[i * 3 + 1] = 0.3; else if (dustPos[i * 3 + 1] < 0.3) dustPos[i * 3 + 1] = 4.8;
+    }
+    (dustGeo.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+  };
 
   // post chain: MSAA render target → bloom → tone mapping / colour space. Rebuilt on quality change.
   let composer: EffectComposer | null = null;
@@ -182,7 +255,7 @@ export function createScene(container: HTMLElement, arena: Arena, quality: Quali
   window.addEventListener('resize', resize);
   setQuality(quality);
   return {
-    renderer, scene, camera, resize, setQuality,
+    renderer, scene, camera, resize, setQuality, update,
     render: () => { if (composer) composer.render(); else renderer.render(scene, camera); },
   };
 }

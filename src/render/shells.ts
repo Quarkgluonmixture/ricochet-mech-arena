@@ -4,7 +4,24 @@ import type { Shell } from '../sim/shell.ts';
 
 const TRAIL = 28;
 
-interface View { mesh: THREE.Mesh; trail: THREE.Line; pts: Float32Array; cols: Float32Array; n: number; color: number }
+interface View { mesh: THREE.Mesh; halo: THREE.Sprite; trail: THREE.Line; pts: Float32Array; cols: Float32Array; n: number; color: number }
+
+/** Soft radial glow for the halo sprite, drawn once. */
+function haloTexture(): THREE.Texture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.25, 'rgba(255,255,255,0.55)');
+  grad.addColorStop(0.6, 'rgba(255,255,255,0.12)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 
 /**
  * One glowing sphere + fading trail per live shell, and a FIXED pool of point lights that follow the
@@ -13,8 +30,9 @@ interface View { mesh: THREE.Mesh; trail: THREE.Line; pts: Float32Array; cols: F
  */
 export class ShellViews {
   private static sphereMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 1.6, 1.6) });
+  private static halo = haloTexture();
   private views = new Map<number, View>();
-  private sphere = new THREE.SphereGeometry(CFG.shell.radius * 1.15, 14, 10);
+  private sphere = new THREE.SphereGeometry(CFG.shell.radius * 0.85, 14, 10);
   private scene: THREE.Scene;
   private colorOf: (owner: number) => number;
   private lights: THREE.PointLight[] = [];
@@ -44,6 +62,7 @@ export class ShellViews {
       let v = this.views.get(s.id);
       if (!v) v = this.create(s);
       v.mesh.position.set(s.pos.x, CFG.shell.height, s.pos.z);
+      v.halo.position.copy(v.mesh.position);
       // shift the trail and append the current position
       const pts = v.pts;
       if (v.n < TRAIL) v.n++;
@@ -59,8 +78,9 @@ export class ShellViews {
     }
     for (const [id, v] of this.views) {
       if (seen.has(id)) continue;
-      this.scene.remove(v.mesh, v.trail);
+      this.scene.remove(v.mesh, v.halo, v.trail);
       v.trail.geometry.dispose();
+      v.halo.material.dispose();
       this.views.delete(id);
     }
     // the newest shells get the lights; the rest glow by emissive + bloom only
@@ -78,6 +98,8 @@ export class ShellViews {
   private create(s: Shell): View {
     const color = this.colorOf(s.owner);
     const mesh = new THREE.Mesh(this.sphere, ShellViews.sphereMat);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: ShellViews.halo, color: new THREE.Color(color).multiplyScalar(1.4), transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
+    halo.scale.setScalar(1.1);
     const pts = new Float32Array(TRAIL * 3);
     const cols = new Float32Array(TRAIL * 3);
     const c = new THREE.Color(color);
@@ -91,8 +113,8 @@ export class ShellViews {
     geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
     const trail = new THREE.Line(geo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9 }));
     trail.frustumCulled = false;
-    this.scene.add(mesh, trail);
-    const v: View = { mesh, trail, pts, cols, n: 0, color };
+    this.scene.add(mesh, halo, trail);
+    const v: View = { mesh, halo, trail, pts, cols, n: 0, color };
     this.views.set(s.id, v);
     return v;
   }
