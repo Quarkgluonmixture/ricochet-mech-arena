@@ -7,14 +7,16 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { Arena } from '../sim/arena.ts';
 import { CFG } from '../sim/config.ts';
 import { TEX, getTexture, hdr } from './assets.ts';
+import { QUALITY, type Quality } from './quality.ts';
 
 export interface SceneBundle {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   resize: () => void;
-  /** Render through the post chain (bloom). */
+  /** Render through the post chain (bloom) or straight, per quality. */
   render: () => void;
+  setQuality: (q: Quality) => void;
 }
 
 export const COLORS = { you: 0x6fb6ff, ai: 0xff6a5c, wall: 0x67728c, wallEdge: 0xb9c7e6, floor: 0x262c3a };
@@ -41,10 +43,10 @@ function scaleBoxUVs(geo: THREE.BoxGeometry, sx: number, sy: number, sz: number)
   uv.needsUpdate = true;
 }
 
-export function createScene(container: HTMLElement, arena: Arena): SceneBundle {
+export function createScene(container: HTMLElement, arena: Arena, quality: Quality = 'medium'): SceneBundle {
   const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.shadowMap.enabled = true;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, QUALITY[quality].pixelRatio));
+  renderer.shadowMap.enabled = QUALITY[quality].shadows;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
@@ -68,12 +70,12 @@ export function createScene(container: HTMLElement, arena: Arena): SceneBundle {
   scene.add(new THREE.AmbientLight(0x404a5e, 0.6));
   const sun = new THREE.DirectionalLight(0xfff1dc, 1.3);
   sun.position.set(18, 30, 12);
-  sun.castShadow = true;
+  sun.castShadow = QUALITY[quality].shadows;
   const half = Math.max(arena.width, arena.depth) * 0.55;
   sun.shadow.camera.left = -half; sun.shadow.camera.right = half;
   sun.shadow.camera.top = half; sun.shadow.camera.bottom = -half;
   sun.shadow.camera.near = 1; sun.shadow.camera.far = 120;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(QUALITY[quality].shadowMap, QUALITY[quality].shadowMap);
   sun.shadow.bias = -0.0003;
   sun.shadow.normalBias = 0.08;
   scene.add(sun);
@@ -129,25 +131,58 @@ export function createScene(container: HTMLElement, arena: Arena): SceneBundle {
   const strips = new THREE.Mesh(mergeGeometries(stripParts), stripMat);
   scene.add(strips);
 
-  // post: MSAA render target → bloom → tone mapping / colour space
-  const size = renderer.getDrawingBufferSize(new THREE.Vector2());
-  const target = new THREE.WebGLRenderTarget(size.x, size.y, { samples: 4, type: THREE.HalfFloatType });
-  const composer = new EffectComposer(renderer, target);
-  composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.32, 0.25, 1.35);
-  composer.addPass(bloom);
-  composer.addPass(new OutputPass());
+  // post chain: MSAA render target → bloom → tone mapping / colour space. Rebuilt on quality change.
+  let composer: EffectComposer | null = null;
+  let bloom: UnrealBloomPass | null = null;
+  let current: Quality = quality;
+  const buildPost = () => {
+    if (composer) { composer.dispose(); composer = null; bloom = null; }
+    const spec = QUALITY[current];
+    if (!spec.bloom) return;
+    const size = renderer.getDrawingBufferSize(new THREE.Vector2());
+    const target = new THREE.WebGLRenderTarget(size.x, size.y, { samples: spec.msaa, type: THREE.HalfFloatType });
+    composer = new EffectComposer(renderer, target);
+    composer.addPass(new RenderPass(scene, camera));
+    bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.32, 0.25, 1.35);
+    composer.addPass(bloom);
+    composer.addPass(new OutputPass());
+  };
 
   const resize = () => {
     const w = container.clientWidth || window.innerWidth;
     const h = container.clientHeight || window.innerHeight;
     renderer.setSize(w, h, false);
-    composer.setSize(w, h);
-    bloom.resolution.set(w / 2, h / 2);
+    if (composer) composer.setSize(w, h);
+    if (bloom) bloom.resolution.set(w / 2, h / 2);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   };
+
+  const setQuality = (q: Quality) => {
+    current = q;
+    const spec = QUALITY[q];
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, spec.pixelRatio));
+    renderer.shadowMap.enabled = spec.shadows;
+    sun.castShadow = spec.shadows;
+    if (sun.shadow.mapSize.x !== spec.shadowMap) {
+      sun.shadow.mapSize.set(spec.shadowMap, spec.shadowMap);
+      sun.shadow.map?.dispose();
+      sun.shadow.map = null;
+    }
+    // shadow on/off is baked into every lit shader
+    scene.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      if (!m) return;
+      for (const mat of Array.isArray(m) ? m : [m]) mat.needsUpdate = true;
+    });
+    buildPost();
+    resize();
+  };
+
   window.addEventListener('resize', resize);
-  resize();
-  return { renderer, scene, camera, resize, render: () => composer.render() };
+  setQuality(quality);
+  return {
+    renderer, scene, camera, resize, setQuality,
+    render: () => { if (composer) composer.render(); else renderer.render(scene, camera); },
+  };
 }

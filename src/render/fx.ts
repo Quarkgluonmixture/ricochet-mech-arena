@@ -2,20 +2,34 @@ import * as THREE from 'three';
 import { CFG } from '../sim/config.ts';
 import { hdr } from './assets.ts';
 
-interface Particle { obj: THREE.Object3D; life: number; ttl: number; vel?: THREE.Vector3; grow?: number; mat: THREE.Material & { opacity: number } }
+interface Particle { obj: THREE.Object3D; life: number; ttl: number; vel?: THREE.Vector3; grow?: number; shrink?: boolean; mat?: THREE.Material & { opacity: number } }
+interface Flash { light: THREE.PointLight; life: number; ttl: number; peak: number }
 
-/** Bounce sparks and hit bursts. Everything is a pooled mesh with a lifetime; nothing here touches the sim. */
-const MAX_LIGHTS = 8;
+const FLASH_POOL = 4;
 
+/**
+ * Bounce sparks, hit bursts, debris. Lights come from a FIXED pool: every change in the number of lights
+ * in a scene recompiles every lit shader, so a light per event meant a hitch on every bounce.
+ */
 export class Fx {
   private items: Particle[] = [];
-  private lights = 0;
+  private flashes: Flash[] = [];
   private ringGeo = new THREE.RingGeometry(0.12, 0.3, 20);
   private cubeGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16);
   private sphereGeo = new THREE.SphereGeometry(1, 16, 12);
+  private debrisGrey = new THREE.MeshStandardMaterial({ color: 0x8a93a6, roughness: 0.6, metalness: 0.3 });
+  private debrisTint = new Map<number, THREE.MeshStandardMaterial>();
   private scene: THREE.Scene;
 
-  constructor(scene: THREE.Scene) { this.scene = scene; }
+  constructor(scene: THREE.Scene) {
+    this.scene = scene;
+    for (let i = 0; i < FLASH_POOL; i++) {
+      const light = new THREE.PointLight(0xffffff, 0, 10, 1.6);
+      light.position.set(0, -50, 0);
+      scene.add(light);
+      this.flashes.push({ light, life: 0, ttl: 0, peak: 0 });
+    }
+  }
 
   bounce(x: number, z: number, nx: number, nz: number, color: number): void {
     const mat = new THREE.MeshBasicMaterial({ color: hdr(color, 2.2), transparent: true, opacity: 0.9, side: THREE.DoubleSide });
@@ -35,49 +49,57 @@ export class Fx {
     this.scene.add(s);
     this.items.push({ obj: s, life: 0, ttl: 0.45, grow: 7, mat });
     this.flash(x, 1.5, z, 0xffffff, 30, 14, 0.25);
-    for (let i = 0; i < 14; i++) {
-      const m = new THREE.MeshStandardMaterial({ color: i % 3 === 0 ? color : 0x8a93a6, transparent: true, opacity: 1 });
-      const c = new THREE.Mesh(this.cubeGeo, m);
+    let tint = this.debrisTint.get(color);
+    if (!tint) { tint = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.3 }); this.debrisTint.set(color, tint); }
+    for (let i = 0; i < 12; i++) {
+      const c = new THREE.Mesh(this.cubeGeo, i % 3 === 0 ? tint : this.debrisGrey);
       c.position.set(x, 1.1, z);
       c.castShadow = true;
       const a = Math.random() * Math.PI * 2;
       const sp = 3 + Math.random() * 6;
       this.scene.add(c);
-      this.items.push({ obj: c, life: 0, ttl: 1.1, vel: new THREE.Vector3(Math.cos(a) * sp, 4 + Math.random() * 6, Math.sin(a) * sp), mat: m });
+      this.items.push({ obj: c, life: 0, ttl: 1.1, shrink: true, vel: new THREE.Vector3(Math.cos(a) * sp, 4 + Math.random() * 6, Math.sin(a) * sp) });
     }
   }
 
-  /** Short-lived point light, capped: every extra light is a shader variant and a per-fragment cost, and a
-   *  fast-forwarded sim can raise hundreds of events in one frame. */
+  /** Short-lived light from the pool: takes the slot with the least life left. */
   private flash(x: number, y: number, z: number, color: number, intensity: number, range: number, ttl: number): void {
-    if (this.lights >= MAX_LIGHTS) return;
-    const light = new THREE.PointLight(color, intensity, range, 1.6);
-    light.position.set(x, y, z);
-    this.scene.add(light);
-    this.lights++;
-    this.items.push({ obj: light, life: 0, ttl, mat: { opacity: 1 } as never });
+    let slot = this.flashes[0];
+    for (const f of this.flashes) if (f.ttl - f.life < slot.ttl - slot.life) slot = f;
+    slot.light.color.set(color);
+    slot.light.intensity = intensity;
+    slot.light.distance = range;
+    slot.light.position.set(x, y, z);
+    slot.life = 0; slot.ttl = ttl; slot.peak = intensity;
   }
 
   update(dt: number): void {
+    for (const fl of this.flashes) {
+      if (fl.ttl <= 0) continue;
+      fl.life += dt;
+      const f = fl.life / fl.ttl;
+      if (f >= 1) { fl.light.intensity = 0; fl.light.position.y = -50; fl.ttl = 0; continue; }
+      fl.light.intensity = fl.peak * (1 - f);
+    }
     for (let i = this.items.length - 1; i >= 0; i--) {
       const p = this.items[i];
       p.life += dt;
       const f = p.life / p.ttl;
       if (f >= 1) {
         this.scene.remove(p.obj);
-        if (p.obj instanceof THREE.PointLight) this.lights--;
+        if (p.mat) p.mat.dispose();
         this.items.splice(i, 1);
         continue;
       }
       if (p.grow) p.obj.scale.setScalar(0.3 + p.grow * f);
+      if (p.shrink) p.obj.scale.setScalar(f < 0.7 ? 1 : Math.max(0.01, 1 - (f - 0.7) / 0.3));
       if (p.vel) {
         p.vel.y -= 18 * dt;
         p.obj.position.addScaledVector(p.vel, dt);
         if (p.obj.position.y < 0.08) { p.obj.position.y = 0.08; p.vel.y *= -0.35; p.vel.x *= 0.7; p.vel.z *= 0.7; }
         p.obj.rotation.x += dt * 5; p.obj.rotation.z += dt * 3;
       }
-      if (p.obj instanceof THREE.PointLight) p.obj.intensity *= 1 - f * 0.4;
-      else p.mat.opacity = 1 - f;
+      if (p.mat) p.mat.opacity = 1 - f;
     }
   }
 }

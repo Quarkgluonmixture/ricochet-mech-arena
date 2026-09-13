@@ -51,13 +51,38 @@ Open `?spectate` in the URL to start in spectator mode.
 - HUD: score, shell pips, dash bar, threat markers around the crosshair for shells outside your view or
   predicted to reach you, a banner that names how each kill happened, and an "AI safe moves N/17" line so
   you can watch it get cornered.
-- Sound is synthesised (fire, bounce, hit, dash, and a per-shell hum positioned by bearing and distance).
+- Sound: Kenney CC0 samples (fire, ricochet, explosion, dash, engine hum per live shell, UI) with a
+  synthesised sub-thump under each shot, positioned by bearing and distance, sent through a shared reverb
+  and summed into a compressor. Credits in `public/audio/sfx/CREDITS.txt`.
+- Music: drop a looping track at `public/audio/bgm.mp3` (Suno or anything else). It fades in on Play or
+  Watch and loops; the volume slider is in Settings. No file, no music, no error.
 - Art: six generated images (floor, wall side, wall top, mech hull, hangar sky, key art) made with the
   Codex image tool from the prompts in `assets-src/PROMPTS.md`; originals in `assets-src/`, the JPEGs the
   game loads in `public/textures/` (`scripts/convert-assets.sh`). Textures tile at fixed metric sizes
   via per-face UV scaling, so a 4 m wall and a 40 m wall show the same panel size. A bloom pass picks up
   only the HDR emissives: shells, wall-edge light frames, visors, muzzle rings, head markers. Delete
   `public/textures/` and the game still runs on flat colours.
+
+## Start screen and settings
+
+The start card doubles as the pause menu (Esc). Settings persist in `localStorage`:
+
+| Setting | What it changes |
+|---|---|
+| Quality | Low: no bloom, no shadows, 1x pixels. Medium (default): 1.25x pixels, 2x MSAA, bloom, 1024 shadows, 4 shell lights. High: full Retina, 4x MSAA, 2048 shadows, 6 shell lights. |
+| Effects / Music | Bus volumes. |
+| Mouse | Sensitivity multiplier. |
+| Show frame time | ms and fps in the corner, so you can pick a quality with numbers. |
+
+## Performance notes
+
+The first visual build stuttered on a Retina display. Three causes, all fixed:
+
+- Rendering at full 2x pixel ratio with a 4x MSAA half-float target plus bloom. Medium caps pixels at 1.25x.
+- A point light per shell and per bounce flash. Every change in the number of lights recompiles every lit
+  shader, so each shot and each expiry was a hitch. Lights are now fixed pools (shells: 4–6 by quality;
+  flashes: 4) that never grow or shrink during play.
+- A fresh material per debris cube. Shared now.
 
 ## Spectator mode
 

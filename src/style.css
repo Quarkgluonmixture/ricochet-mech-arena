@@ -51,10 +51,29 @@ html, body { margin: 0; height: 100%; background: #0b0e14; color: var(--ink); ov
 #overlay .lede { color: var(--dim); font-size: 15px; line-height: 1.5; margin: 0 0 18px; }
 #overlay ul { list-style: none; padding: 0; margin: 0 0 22px; color: var(--dim); font-size: 14px; line-height: 1.9; }
 #overlay b { color: var(--ink); }
-#overlay .buttons { display: flex; gap: 10px; }
-#play, #watch { font: inherit; font-size: 16px; font-weight: 600; padding: 12px 22px; border-radius: 10px; border: 0; background: var(--you); color: #08111e; cursor: pointer; }
-#watch.secondary { background: rgba(255,255,255,0.1); color: var(--ink); border: 1px solid rgba(255,255,255,0.18); }
-#play:hover, #watch:hover { filter: brightness(1.1); }
+#overlay .buttons { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+#overlay button { font: inherit; font-size: 16px; font-weight: 600; padding: 12px 22px; border-radius: 10px; border: 0; cursor: pointer; }
+#overlay button.primary { background: var(--you); color: #08111e; box-shadow: 0 0 22px rgba(111,182,255,0.35); }
+#overlay button.secondary { background: rgba(255,255,255,0.08); color: var(--ink); border: 1px solid rgba(255,255,255,0.18); }
+#overlay button:hover { filter: brightness(1.12); }
+#overlay button:disabled { opacity: 0.45; cursor: default; filter: none; }
+#loading { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--dim); margin: 0 0 14px; }
+#loading .bar { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.12); overflow: hidden; }
+#loading .bar i { display: block; height: 100%; width: 0; background: var(--you); transition: width 0.2s; }
+#loading.done { display: none; }
+#overlay ul.controls { margin-bottom: 14px; }
+#settings { display: grid; gap: 10px; padding: 14px 16px 6px; margin: 0 0 14px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; }
+#settings.hidden { display: none; }
+#settings label { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 12px; font-size: 14px; color: var(--dim); }
+#settings label.check { grid-template-columns: auto 1fr; }
+#settings select, #settings input[type=range] { width: 100%; font: inherit; }
+#settings select { padding: 6px 8px; border-radius: 8px; background: #0e1219; color: var(--ink); border: 1px solid rgba(255,255,255,0.18); }
+#settings input[type=range] { accent-color: var(--you); }
+#settings .buttons { margin: 4px 0 8px; }
+#overlay .credits { margin: 0; font-size: 12px; color: var(--dim); }
+#overlay .credits code { font-size: 11px; color: var(--ink); }
+#fps { position: absolute; right: 18px; bottom: 40px; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; display: none; pointer-events: none; }
+#fps.show { display: block; }
 
 @media (max-width: 720px) {
   #radar { width: 150px; height: 150px; }

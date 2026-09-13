@@ -9,6 +9,7 @@ import { Fx } from './render/fx.ts';
 import { HeadMarker } from './render/marker.ts';
 import { MechView } from './render/mech.ts';
 import { TEX } from './render/assets.ts';
+import { QUALITY } from './render/quality.ts';
 import { COLORS, createScene } from './render/scene.ts';
 import { ShellViews } from './render/shells.ts';
 import { SpectatorCamera } from './render/spectator.ts';
@@ -16,6 +17,7 @@ import { GroundTrail } from './render/trail.ts';
 import { Audio } from './ui/audio.ts';
 import { Hud } from './ui/hud.ts';
 import { Radar } from './ui/radar.ts';
+import { loadSettings, saveSettings } from './ui/settings.ts';
 import { ThreatRing } from './ui/threat.ts';
 
 // ---- world ----------------------------------------------------------------------------------
@@ -28,11 +30,12 @@ const aiState: AiState = makeAiState(enemy.torsoYaw);
 const blueState: AiState = makeAiState(player.torsoYaw);
 
 // ---- render + ui ----------------------------------------------------------------------------
+const settings = loadSettings();
 const view = document.getElementById('view') as HTMLElement;
-const { renderer, scene, camera, render } = createScene(view, arena);
+const { renderer, scene, camera, render, setQuality } = createScene(view, arena, settings.quality);
 const playerView = new MechView(scene, COLORS.you);
 const enemyView = new MechView(scene, COLORS.ai);
-const shellViews = new ShellViews(scene, (owner) => (owner === player.id ? COLORS.you : COLORS.ai));
+const shellViews = new ShellViews(scene, (owner) => (owner === player.id ? COLORS.you : COLORS.ai), QUALITY[settings.quality].shellLights);
 const fx = new Fx(scene);
 const enemyMarker = new HeadMarker(scene, COLORS.ai);
 const playerMarker = new HeadMarker(scene, COLORS.you);
@@ -44,8 +47,53 @@ const hud = new Hud();
 const radar = new Radar(document.getElementById('radar') as HTMLCanvasElement, arena, { you: '#6fb6ff', ai: '#ff6a5c' });
 const threat = new ThreatRing(document.getElementById('threat') as HTMLCanvasElement);
 const audio = new Audio();
+audio.setVolumes(settings.sfx, settings.music);
 hud.setCamMode(rig.mode);
 hud.setKeyArt(TEX.keyart);
+
+// ---- start screen: preload, settings panel, music ---------------------------------------------
+const MUSIC_URL = 'audio/bgm.mp3';
+void audio.preload().then(() => hud.setLoading(audio.loaded, audio.total));
+const loadingTick = setInterval(() => {
+  hud.setLoading(audio.loaded, audio.total);
+  if (audio.total > 0 && audio.loaded >= audio.total) clearInterval(loadingTick);
+}, 100);
+
+const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
+const setQ = $<HTMLSelectElement>('set-quality');
+const setSfx = $<HTMLInputElement>('set-sfx');
+const setMusic = $<HTMLInputElement>('set-music');
+const setSens = $<HTMLInputElement>('set-sens');
+const setFps = $<HTMLInputElement>('set-fps');
+setQ.value = settings.quality; setSfx.value = String(settings.sfx); setMusic.value = String(settings.music);
+setSens.value = String(settings.sensitivity); setFps.checked = settings.showFps;
+const applySettings = () => {
+  saveSettings(settings);
+  audio.setVolumes(settings.sfx, settings.music);
+  hud.setFps(settings.showFps ? 0 : null);
+};
+setQ.addEventListener('change', () => {
+  settings.quality = setQ.value as typeof settings.quality;
+  setQuality(settings.quality);
+  shellViews.setLightCount(QUALITY[settings.quality].shellLights);
+  audio.ui('switch');
+  applySettings();
+});
+setSfx.addEventListener('input', () => { settings.sfx = Number(setSfx.value); applySettings(); });
+setSfx.addEventListener('change', () => audio.ui('click'));
+setMusic.addEventListener('input', () => { settings.music = Number(setMusic.value); applySettings(); });
+setSens.addEventListener('input', () => { settings.sensitivity = Number(setSens.value); applySettings(); });
+setFps.addEventListener('change', () => { settings.showFps = setFps.checked; audio.ui('switch'); applySettings(); });
+$('settings-btn').addEventListener('click', () => { audio.unlock(); audio.ui('click'); hud.showSettings(true); });
+$('settings-close').addEventListener('click', () => { audio.ui('back'); hud.showSettings(false); });
+applySettings();
+
+let musicTried = false;
+function startMusic(): void {
+  if (musicTried) return;
+  musicTried = true;
+  void audio.startMusic(MUSIC_URL).then((ok) => hud.setMusicStatus(ok ? 'Music: your track, looping.' : 'No music track found — add public/audio/bgm.mp3.'));
+}
 
 // ---- input ----------------------------------------------------------------------------------
 const keys = new Set<string>();
@@ -56,7 +104,7 @@ let dashPressed = false;
 let locked = false;
 let spectating = false;
 let dragging = false;
-const SENS = 0.0022;
+const SENS = 0.0022; // × settings.sensitivity
 
 function setSpectate(on: boolean): void {
   if (spectating === on) return;
@@ -74,7 +122,7 @@ function setSpectate(on: boolean): void {
     enemy.maxShells = CFG.ai.maxShells; enemy.fireCooldown = CFG.ai.fireCooldown;
     yaw = player.torsoYaw;
     rig.pitch = 0;
-    hud.setOverlay(!locked);
+    hud.setOverlay(!locked, world.time > 0);
   }
 }
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -98,8 +146,8 @@ document.addEventListener('keyup', (e) => keys.delete(e.code));
 document.addEventListener('mousemove', (e) => {
   if (spectating) { if (dragging) spec.orbit(-e.movementX * 0.006); return; }
   if (!locked) return;
-  yaw -= e.movementX * SENS;
-  rig.pitch = clamp(rig.pitch - e.movementY * SENS, -1.2, 1.2);
+  yaw -= e.movementX * SENS * settings.sensitivity;
+  rig.pitch = clamp(rig.pitch - e.movementY * SENS * settings.sensitivity, -1.2, 1.2);
 });
 document.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return;
@@ -112,15 +160,17 @@ document.addEventListener('mouseup', (e) => { if (e.button === 0) { fireHeld = f
 document.addEventListener('wheel', (e) => { if (spectating) spec.zoomBy(e.deltaY > 0 ? 1.12 : 0.89); }, { passive: true });
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === renderer.domElement;
-  hud.setOverlay(!locked);
-  if (!locked) { keys.clear(); fireHeld = false; }
+  hud.setOverlay(!locked, world.time > 0);
+  if (!locked) { keys.clear(); fireHeld = false; hud.showSettings(false); }
 });
 const play = () => {
   audio.unlock();
+  audio.ui('confirm');
+  startMusic();
   renderer.domElement.requestPointerLock();
 };
-(document.getElementById('play') as HTMLElement).addEventListener('click', play);
-(document.getElementById('watch') as HTMLElement).addEventListener('click', () => { audio.unlock(); setSpectate(true); });
+$('play').addEventListener('click', play);
+$('watch').addEventListener('click', () => { audio.unlock(); audio.ui('confirm'); startMusic(); setSpectate(true); });
 view.addEventListener('click', () => { if (!locked && !spectating) play(); });
 
 function playerInput(): MechInput {
@@ -187,6 +237,7 @@ function handleEvents(): void {
         rig.pitch = 0;
         enemyTrail.reset();
         playerTrail.reset();
+        audio.round();
         break;
       default:
         break;
@@ -198,6 +249,8 @@ function handleEvents(): void {
 const STEP = 1 / 120;
 let acc = 0;
 let last = performance.now();
+let frameMs = 16;
+let fpsTimer = 0;
 
 function simStep(input: MechInput | null): void {
   const blue = spectating ? aiThink(world, player, enemy, blueState, STEP) : input;
@@ -206,8 +259,12 @@ function simStep(input: MechInput | null): void {
 }
 
 function frame(now: number): void {
-  const dt = Math.min(0.1, (now - last) / 1000);
+  const raw = now - last;
+  const dt = Math.min(0.1, raw / 1000);
   last = now;
+  frameMs += (raw - frameMs) * 0.08;
+  fpsTimer += dt;
+  if (settings.showFps && fpsTimer > 0.4) { fpsTimer = 0; hud.setFps(frameMs); }
   if (locked || spectating) {
     acc += dt;
     while (acc >= STEP) { simStep(spectating ? null : playerInput()); acc -= STEP; }

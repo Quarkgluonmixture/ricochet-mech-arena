@@ -4,18 +4,36 @@ import type { Shell } from '../sim/shell.ts';
 
 const TRAIL = 28;
 
-interface View { mesh: THREE.Mesh; light: THREE.PointLight; trail: THREE.Line; pts: Float32Array; cols: Float32Array; n: number }
+interface View { mesh: THREE.Mesh; trail: THREE.Line; pts: Float32Array; cols: Float32Array; n: number; color: number }
 
-/** One glowing sphere + point light + fading trail per live shell. */
+/**
+ * One glowing sphere + fading trail per live shell, and a FIXED pool of point lights that follow the
+ * newest shells. The pool never grows or shrinks during play: every change in the number of lights in a
+ * scene recompiles every lit shader, and a light per shell meant a hitch on every shot and every expiry.
+ */
 export class ShellViews {
+  private static sphereMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 1.6, 1.6) });
   private views = new Map<number, View>();
   private sphere = new THREE.SphereGeometry(CFG.shell.radius * 1.15, 14, 10);
   private scene: THREE.Scene;
   private colorOf: (owner: number) => number;
+  private lights: THREE.PointLight[] = [];
 
-  constructor(scene: THREE.Scene, colorOf: (owner: number) => number) {
+  constructor(scene: THREE.Scene, colorOf: (owner: number) => number, lightCount = 4) {
     this.scene = scene;
     this.colorOf = colorOf;
+    this.setLightCount(lightCount);
+  }
+
+  /** Resize the pool (quality change). One recompile, not one per shot. */
+  setLightCount(n: number): void {
+    while (this.lights.length > n) { const l = this.lights.pop()!; this.scene.remove(l); l.dispose(); }
+    while (this.lights.length < n) {
+      const l = new THREE.PointLight(0xffffff, 0, 9, 1.6);
+      l.position.set(0, -50, 0);
+      this.scene.add(l);
+      this.lights.push(l);
+    }
   }
 
   sync(shells: Shell[]): void {
@@ -26,7 +44,6 @@ export class ShellViews {
       let v = this.views.get(s.id);
       if (!v) v = this.create(s);
       v.mesh.position.set(s.pos.x, CFG.shell.height, s.pos.z);
-      v.light.position.copy(v.mesh.position);
       // shift the trail and append the current position
       const pts = v.pts;
       if (v.n < TRAIL) v.n++;
@@ -42,16 +59,25 @@ export class ShellViews {
     }
     for (const [id, v] of this.views) {
       if (seen.has(id)) continue;
-      this.scene.remove(v.mesh, v.light, v.trail);
+      this.scene.remove(v.mesh, v.trail);
       v.trail.geometry.dispose();
       this.views.delete(id);
+    }
+    // the newest shells get the lights; the rest glow by emissive + bloom only
+    const live = shells.filter((s) => s.alive).sort((a, b) => b.id - a.id);
+    for (let i = 0; i < this.lights.length; i++) {
+      const l = this.lights[i];
+      const s = live[i];
+      if (!s) { l.intensity = 0; l.position.y = -50; continue; }
+      l.intensity = 6;
+      l.color.set(this.colorOf(s.owner));
+      l.position.set(s.pos.x, CFG.shell.height, s.pos.z);
     }
   }
 
   private create(s: Shell): View {
     const color = this.colorOf(s.owner);
-    const mesh = new THREE.Mesh(this.sphere, new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 1.6, 1.6) }));
-    const light = new THREE.PointLight(color, 6, 9, 1.6);
+    const mesh = new THREE.Mesh(this.sphere, ShellViews.sphereMat);
     const pts = new Float32Array(TRAIL * 3);
     const cols = new Float32Array(TRAIL * 3);
     const c = new THREE.Color(color);
@@ -65,8 +91,8 @@ export class ShellViews {
     geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
     const trail = new THREE.Line(geo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9 }));
     trail.frustumCulled = false;
-    this.scene.add(mesh, light, trail);
-    const v: View = { mesh, light, trail, pts, cols, n: 0 };
+    this.scene.add(mesh, trail);
+    const v: View = { mesh, trail, pts, cols, n: 0, color };
     this.views.set(s.id, v);
     return v;
   }

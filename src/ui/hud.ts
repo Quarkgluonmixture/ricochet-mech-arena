@@ -31,7 +31,31 @@ export class Hud {
     }
   }
 
-  setOverlay(visible: boolean): void { this.overlay.classList.toggle('hidden', !visible); }
+  private playBtn = $<HTMLButtonElement>('play');
+  private loading = $('loading');
+  private loadingBar = $('loading-bar');
+  private loadingText = $('loading-text');
+  private settingsPanel = $('settings');
+  private musicStatus = $('music-status');
+  private fps = $('fps');
+
+  /** Show the menu. `inProgress` turns the primary button into Resume. */
+  setOverlay(visible: boolean, inProgress = false): void {
+    this.overlay.classList.toggle('hidden', !visible);
+    if (visible) this.playBtn.textContent = inProgress ? 'Resume' : 'Play';
+  }
+  setLoading(loaded: number, total: number): void {
+    const done = total > 0 && loaded >= total;
+    this.loading.classList.toggle('done', done);
+    this.loadingBar.style.width = total > 0 ? `${Math.round((loaded / total) * 100)}%` : '0%';
+    this.loadingText.textContent = done ? '' : `Loading sounds… ${loaded}/${total}`;
+  }
+  showSettings(on: boolean): void { this.settingsPanel.classList.toggle('hidden', !on); }
+  setMusicStatus(text: string): void { this.musicStatus.textContent = text; }
+  setFps(ms: number | null): void {
+    this.fps.classList.toggle('show', ms !== null);
+    if (ms !== null) this.fps.textContent = `${ms.toFixed(1)} ms · ${Math.round(1000 / Math.max(ms, 0.1))} fps`;
+  }
   /** Key art behind the start card. A relative URL so it works in dev and under the Pages sub-path. */
   setKeyArt(url: string): void { this.overlay.style.backgroundImage = `linear-gradient(rgba(6,8,12,0.45), rgba(6,8,12,0.8)), url('${url}')`; }
   setSpectate(on: boolean): void { this.hud.classList.toggle('spectate', on); }
