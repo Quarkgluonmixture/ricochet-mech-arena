@@ -51,7 +51,10 @@ export function createScene(container: HTMLElement, arena: Arena): SceneBundle {
   grid.position.y = 0.01;
   scene.add(grid);
 
-  const wallMat = new THREE.MeshStandardMaterial({ color: COLORS.wall, roughness: 0.85, metalness: 0.1 });
+  const wallSide = new THREE.MeshStandardMaterial({ color: COLORS.wall, roughness: 0.85, metalness: 0.1 });
+  // darker top face: with 1.5 m walls seen from a 1.9 m eye, the tops are a large part of the picture
+  const wallTop = new THREE.MeshStandardMaterial({ color: 0x3d4557, roughness: 0.95, metalness: 0.05 });
+  const wallMat = [wallSide, wallSide, wallTop, wallSide, wallSide, wallSide];
   const edgeMat = new THREE.LineBasicMaterial({ color: COLORS.wallEdge, transparent: true, opacity: 0.8 });
   const stripMat = new THREE.MeshBasicMaterial({ color: 0x4f8fe0 });
   for (const w of arena.walls) {

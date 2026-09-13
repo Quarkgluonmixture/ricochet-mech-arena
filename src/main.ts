@@ -6,9 +6,11 @@ import type { MechInput } from './sim/mech.ts';
 import { World } from './sim/world.ts';
 import { CameraRig } from './render/camera.ts';
 import { Fx } from './render/fx.ts';
+import { HeadMarker } from './render/marker.ts';
 import { MechView } from './render/mech.ts';
 import { COLORS, createScene } from './render/scene.ts';
 import { ShellViews } from './render/shells.ts';
+import { GroundTrail } from './render/trail.ts';
 import { Audio } from './ui/audio.ts';
 import { Hud } from './ui/hud.ts';
 import { Radar } from './ui/radar.ts';
@@ -28,6 +30,9 @@ const playerView = new MechView(scene, COLORS.you);
 const enemyView = new MechView(scene, COLORS.ai);
 const shellViews = new ShellViews(scene, (owner) => (owner === player.id ? COLORS.you : COLORS.ai));
 const fx = new Fx(scene);
+const enemyMarker = new HeadMarker(scene, COLORS.ai);
+const enemyTrail = new GroundTrail(scene, COLORS.ai);
+const playerTrail = new GroundTrail(scene, COLORS.you);
 const rig = new CameraRig(camera, scene, arena.walls, COLORS.you);
 const hud = new Hud();
 const radar = new Radar(document.getElementById('radar') as HTMLCanvasElement, arena, { you: '#6fb6ff', ai: '#ff6a5c' });
@@ -134,6 +139,8 @@ function handleEvents(): void {
       case 'round':
         yaw = player.torsoYaw;
         rig.pitch = 0;
+        enemyTrail.reset();
+        playerTrail.reset();
         break;
       default:
         break;
@@ -164,11 +171,14 @@ function frame(now: number): void {
   shellViews.sync(world.shells);
   fx.update(dt);
   rig.update(player, dt);
+  enemyMarker.update(enemy, camera, dt);
+  enemyTrail.update(enemy, dt);
+  playerTrail.update(player, dt);
   audio.setListener(player.pos, player.torsoYaw);
   audio.syncHums(world.shells, player.id);
   radar.draw(world, player, enemy);
   const hfov = 2 * Math.atan(Math.tan((camera.fov * Math.PI) / 360) * camera.aspect);
-  threat.draw(world, player, rig.mode === 'first' ? hfov / 2 : Math.PI * 0.4);
+  threat.draw(world, player, enemy, rig.mode === 'first' ? hfov / 2 : Math.PI * 0.4);
   hud.update(player, enemy, aiState.lastSafe, aiState.lastCandidates, dt);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);

@@ -20,7 +20,7 @@ npm run build    # tsc + vite → dist/
 | Input | Action |
 |---|---|
 | Mouse | aim (torso). Pitch is look-only: shells always fly level. |
-| Left click | fire (up to 4 shells in flight) |
+| Left click | fire (up to 8 shells in flight) |
 | W A S D | move relative to where you look. Inertia: the speed cap is shared with the AI. |
 | Shift / Space | dash: a short burst in the movement direction, 1.4 s cooldown (bar under the shell pips) |
 | V | first ↔ third person |
@@ -29,15 +29,19 @@ npm run build    # tsc + vite → dist/
 
 ## Rules (M0)
 
-- One arena (`MAP_A` in `src/sim/arena.ts`), 180°-rotation symmetric, 4 m corridors, 3 m walls.
+- One arena (`MAP_A` in `src/sim/arena.ts`), 180°-rotation symmetric, 4 m corridors, **1.5 m walls**:
+  they block shells (flying at 1.2 m) but not your 1.9 m eye, so you see the enemy's torso over the maze.
 - Shells fly at 16 m/s, bounce **once** off walls, die on the second wall or after 5 s. They hit anyone,
   including the shooter after the first bounce or 0.15 s. One hit kills; the round resets 2 s later.
 - The AI has exactly your movement model (`stepMotion` in `src/sim/mech.ts` is the only one), 2 shells
-  in flight, and a torso that slews at 6 rad/s.
-- HUD: score, shell pips, dash bar, a rotating radar (walls, both mechs, live shells and their predicted
-  paths), threat markers around the crosshair for shells outside your view or predicted to reach you,
-  a banner that names how each kill happened, and an "AI safe moves N/17" line so you can watch it get
-  cornered.
+  in flight, one shot per second at most, and a torso that slews at 6 rad/s.
+- Finding it: an always-on-top diamond over the enemy's head, a bearing marker with distance around the
+  crosshair whenever it is outside your view, and a rotating radar (walls, both mechs pinned to the rim
+  when out of range, live shells and their predicted paths). Its recent path is drawn on the floor so the
+  footwork is visible.
+- HUD: score, shell pips, dash bar, threat markers around the crosshair for shells outside your view or
+  predicted to reach you, a banner that names how each kill happened, and an "AI safe moves N/17" line so
+  you can watch it get cornered.
 - No external assets: mechs are primitives, sounds are synthesised (fire, bounce, hit, dash, and a
   per-shell hum positioned by bearing and distance).
 

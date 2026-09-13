@@ -50,7 +50,7 @@ export class Hud {
     const frac = ready ? 1 : 1 - player.dashCd / CFG.mech.dashCooldown;
     this.dashFill.style.transform = `scaleX(${frac.toFixed(3)})`;
     this.dash.classList.toggle('ready', ready);
-    this.aiDebug.textContent = ai.alive ? `AI safe moves ${aiSafe}/${aiTotal}${aiSafe === 0 ? ' — trapped' : ''}` : '';
+    this.aiDebug.textContent = ai.alive && aiTotal > 0 ? `AI safe moves ${aiSafe}/${aiTotal}${aiSafe === 0 ? ' — trapped' : ''}` : '';
     if (this.bannerTimer > 0) {
       this.bannerTimer -= dt;
       if (this.bannerTimer <= 0) { this.banner.className = ''; this.hint.className = ''; }

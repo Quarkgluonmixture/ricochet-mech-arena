@@ -20,7 +20,7 @@ export class ThreatRing {
     this.size = canvas.width;
   }
 
-  draw(world: World, player: Mech, fovHalfAngle: number): void {
+  draw(world: World, player: Mech, enemy: Mech, fovHalfAngle: number): void {
     const ctx = this.ctx;
     const S = this.size;
     const R = S * 0.36;
@@ -28,6 +28,35 @@ export class ThreatRing {
     if (!player.alive) return;
     const f = forward(player.torsoYaw);
     const r = right(player.torsoYaw);
+
+    // enemy bearing marker when it is outside the view: a diamond on an outer ring plus the distance
+    if (enemy.alive) {
+      const dx = enemy.pos.x - player.pos.x, dz = enemy.pos.z - player.pos.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 1e-3) {
+        const sx = (dx * r.x + dz * r.z) / d;
+        const sy = -(dx * f.x + dz * f.z) / d;
+        const angleOff = Math.acos(Math.max(-1, Math.min(1, -sy)));
+        if (angleOff > fovHalfAngle * 0.9) {
+          const RR = R + 34;
+          const px = S / 2 + sx * RR, py = S / 2 + sy * RR;
+          ctx.save();
+          ctx.translate(px, py);
+          ctx.rotate(Math.atan2(sy, sx) + Math.PI / 2);
+          ctx.fillStyle = 'rgba(255, 106, 92, 0.95)';
+          ctx.beginPath();
+          ctx.moveTo(0, -13); ctx.lineTo(9, 0); ctx.lineTo(0, 13); ctx.lineTo(-9, 0); ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+          ctx.fillStyle = 'rgba(255, 106, 92, 0.95)';
+          ctx.font = '600 13px ui-sans-serif, system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`${Math.round(d)} m`, S / 2 + sx * (RR + 26), S / 2 + sy * (RR + 26));
+        }
+      }
+    }
+
     const hitR = player.radius + CFG.shell.radius + 0.4;
     for (const s of world.shells) {
       if (!s.alive) continue;

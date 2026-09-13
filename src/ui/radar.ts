@@ -81,6 +81,17 @@ export class Radar {
     };
     tri(ai, this.colors.ai);
     tri(player, this.colors.you);
+    // enemy beyond the radar's range: pin a diamond to the rim along its bearing
+    const dEnemy = Math.hypot(ai.pos.x - player.pos.x, ai.pos.z - player.pos.z);
+    const rim = metresVisible / 2 - 1.2;
+    if (ai.alive && dEnemy > rim) {
+      const ux = (ai.pos.x - player.pos.x) / dEnemy, uz = (ai.pos.z - player.pos.z) / dEnemy;
+      const px = player.pos.x + ux * rim, pz = player.pos.z + uz * rim;
+      ctx.fillStyle = this.colors.ai;
+      ctx.beginPath();
+      ctx.moveTo(px, pz - 1.1); ctx.lineTo(px + 0.8, pz); ctx.lineTo(px, pz + 1.1); ctx.lineTo(px - 0.8, pz); ctx.closePath();
+      ctx.fill();
+    }
     ctx.restore();
 
     ctx.strokeStyle = 'rgba(255,255,255,0.18)';

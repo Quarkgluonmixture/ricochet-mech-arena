@@ -5,7 +5,9 @@
 export const CFG = {
   /** Arena grid cell size in metres. Walls are full cells. */
   cell: 4,
-  wallHeight: 3,
+  /** Walls block shells (which fly at 1.2 m) but not sight: from a 1.9 m eye you see the enemy's torso over
+   *  them, which is what makes first person readable (VISION §5.6). */
+  wallHeight: 1.5,
 
   mech: {
     radius: 0.7,
@@ -19,8 +21,8 @@ export const CFG = {
     dashSpeed: 18,
     dashTime: 0.16,
     dashCooldown: 1.4,
-    /** Camera height for the first-person view (render only). */
-    eyeHeight: 1.75,
+    /** Camera height for the first-person view (render only). Above the walls on purpose. */
+    eyeHeight: 1.9,
     /** Torso (turret) slew rate for the AI, rad/s. The player's mouse is unbounded. */
     torsoTurnRateAI: 6,
     /** Visual only: how fast the legs turn to face the movement direction. */
@@ -39,11 +41,12 @@ export const CFG = {
     selfArmTime: 0.15,
   },
 
-  player: { maxShells: 4, fireCooldown: 0.22 },
+  /** Many shells in flight: pressure is what makes the AI's footwork visible. */
+  player: { maxShells: 8, fireCooldown: 0.15 },
 
   ai: {
     maxShells: 2,
-    fireCooldown: 0.7,
+    fireCooldown: 1.0,
     /** How far ahead (s) the dodge search looks. */
     horizon: 1.5,
     /** Replan interval (s) — the AI's "wind-up"; VISION §4 "telegraphed". */
