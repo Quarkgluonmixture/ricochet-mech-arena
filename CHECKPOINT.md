@@ -2,11 +2,12 @@
 
 ## 现场（截至 2026-09-13 深夜）
 
-- 机甲之间有碰撞体积（含队友），AI 预演把别的机甲当障碍；菜单音乐开站即尝试渐入。
-- **线上可玩**：<https://quarkgluonmixture.github.io/ricochet-mech-arena/>。Play = 1v1 决斗（PvE 固定）；观战 / attract =
-  AI 对战，阵容在设置「观战阵容」（默认 3v3，AI 会集火 + 交叉火力）、
-  默认中文、人 3 命 / AI 1 命、Codex 生图素材 + 按概念图重建的机甲、Kenney 采样音效 + 两首 Suno 曲、
-  attract 菜单、观战模式、击杀播报。规则与操作以 `README.md` 为准。
+- **线上可玩**：<https://quarkgluonmixture.github.io/ricochet-mech-arena/>。规则与操作以 `README.md` 为准。
+  - **Play = 1v1 决斗（PvE 固定）**，人 3 命 / AI 1 命，命条在右上角。
+  - **观战 / attract = AI 对战**，阵容在设置「观战阵容」（默认 3v3）；队友会集火同一目标并从相差 90° 的方向进攻。
+  - 机甲之间有碰撞体积（含队友），AI 走位预演把别的机甲当障碍。
+  - 默认中文（文案为 Gemini 3.8 Flash 重写版，术语见「接手」#4）；Codex 生图素材 + 按概念图重建的机甲；
+    Kenney 采样音效 + 两首 Suno 曲，菜单曲开站即尝试渐入；击杀播报；attract 菜单。
 - **cursor**：`docs/ROADMAP.md` → M3 已 ship；下一步 = 观赏性方向 2（击杀慢镜头），见 `TODO.md`。
 - ⚠ **今天下午之后的改动没有一项经真人玩过**（矮墙之后的全部）。真人验证清单在 `TODO.md` 第一节，
   先让用户玩，再决定改什么。
