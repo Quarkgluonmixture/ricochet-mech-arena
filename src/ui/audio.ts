@@ -31,13 +31,14 @@ export class Audio {
   private master!: GainNode;
   private sfxBus!: GainNode;
   private musicBus!: GainNode;
+  private sfxDuck!: GainNode;
+  private musicDuck!: GainNode;
   private reverb!: ConvolverNode;
   private reverbSend!: GainNode;
   private buffers = new Map<string, AudioBuffer>();
   private hums = new Map<number, Hum>();
   private listenerPos: Vec2 = { x: 0, z: 0 };
   private listenerYaw = 0;
-  private music: { src: AudioBufferSourceNode; gain: GainNode; url: string } | null = null;
   private loading: Promise<void> | null = null;
   private volumes = { sfx: 0.8, music: 0.6 };
   /** Load progress for the start screen. */
@@ -56,12 +57,17 @@ export class Audio {
     this.master = ctx.createGain();
     this.master.gain.value = 0.9;
     this.master.connect(comp);
+    // volume (user setting) → duck (situational: menu, attract) → master
+    this.sfxDuck = ctx.createGain();
+    this.sfxDuck.connect(this.master);
     this.sfxBus = ctx.createGain();
     this.sfxBus.gain.value = this.volumes.sfx;
-    this.sfxBus.connect(this.master);
+    this.sfxBus.connect(this.sfxDuck);
+    this.musicDuck = ctx.createGain();
+    this.musicDuck.connect(this.master);
     this.musicBus = ctx.createGain();
     this.musicBus.gain.value = this.volumes.music;
-    this.musicBus.connect(this.master);
+    this.musicBus.connect(this.musicDuck);
     // reverb: 1.6 s exponentially decaying stereo noise, a little darker on the tail
     this.reverb = ctx.createConvolver();
     const len = Math.floor(ctx.sampleRate * 1.6);
@@ -114,6 +120,13 @@ export class Audio {
     if (!this.ctx) return;
     this.sfxBus.gain.setTargetAtTime(sfx, this.ctx.currentTime, 0.05);
     this.musicBus.gain.setTargetAtTime(music, this.ctx.currentTime, 0.05);
+  }
+
+  /** Situational attenuation on top of the user volumes: attract mode mutes effects, pause ducks music. */
+  setDuck(sfx: number, music: number): void {
+    if (!this.ctx) return;
+    this.sfxDuck.gain.setTargetAtTime(sfx, this.ctx.currentTime, 0.15);
+    this.musicDuck.gain.setTargetAtTime(music, this.ctx.currentTime, 0.3);
   }
 
   setListener(pos: Vec2, yaw: number): void { this.listenerPos = pos; this.listenerYaw = yaw; }
@@ -224,37 +237,81 @@ export class Audio {
     }
   }
 
-  /** Loop a music track (fade in). Missing or undecodable file = no music, no error. */
-  async startMusic(url: string): Promise<boolean> {
-    const ctx = this.ensure();
+  private tracks = new Map<string, Promise<AudioBuffer | null>>();
+  private music: { url: string; gain: GainNode; timer: number; sources: AudioBufferSourceNode[] } | null = null;
+  private static OVERLAP = 2.5;
+
+  /** Fetch + decode once per URL. A missing or undecodable file resolves to null, never throws. */
+  private loadTrack(url: string): Promise<AudioBuffer | null> {
+    let p = this.tracks.get(url);
+    if (!p) {
+      const ctx = this.ensure();
+      p = (async () => {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) return null;
+          const type = res.headers.get('content-type') ?? '';
+          if (type.includes('text/html')) return null; // dev server SPA fallback for a missing file
+          return await ctx.decodeAudioData(await res.arrayBuffer());
+        } catch {
+          return null;
+        }
+      })();
+      this.tracks.set(url, p);
+    }
+    return p;
+  }
+
+  /**
+   * Play a track as a seamless loop: each pass fades out over the last OVERLAP seconds while the next pass
+   * fades in on top, so any exported song loops without a click or a gap. Crossfades from whatever is
+   * playing. Returns false (and leaves the current track alone) when the file is missing.
+   */
+  async playTrack(url: string, fadeIn = 2): Promise<boolean> {
+    const buf = await this.loadTrack(url);
+    if (!buf) return false;
     if (this.music && this.music.url === url) return true;
-    this.stopMusic();
-    try {
-      const res = await fetch(url);
-      if (!res.ok) return false;
-      const buf = await ctx.decodeAudioData(await res.arrayBuffer());
+    const ctx = this.ensure();
+    this.stopTrack(1.5);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(1, ctx.currentTime + fadeIn);
+    gain.connect(this.musicBus);
+    const entry = { url, gain, timer: 0, sources: [] as AudioBufferSourceNode[] };
+    this.music = entry;
+    const OV = Math.min(Audio.OVERLAP, buf.duration / 3);
+    const pass = (at: number, first: boolean) => {
       const src = ctx.createBufferSource();
       src.buffer = buf;
-      src.loop = true;
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 2);
-      src.connect(gain).connect(this.musicBus);
-      src.start();
-      this.music = { src, gain, url };
-      return true;
-    } catch {
-      return false;
-    }
+      const g = ctx.createGain();
+      if (first) g.gain.setValueAtTime(1, at);
+      else { g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(1, at + OV); }
+      const end = at + buf.duration;
+      g.gain.setValueAtTime(1, end - OV);
+      g.gain.linearRampToValueAtTime(0, end);
+      src.connect(g).connect(gain);
+      src.start(at);
+      src.stop(end + 0.05);
+      entry.sources.push(src);
+      src.onended = () => { entry.sources = entry.sources.filter((x) => x !== src); };
+      const next = end - OV;
+      entry.timer = window.setTimeout(() => { if (this.music === entry) pass(next, false); }, Math.max(0, (next - ctx.currentTime - 0.6) * 1000));
+    };
+    pass(ctx.currentTime + 0.05, true);
+    return true;
   }
 
-  stopMusic(): void {
+  stopTrack(fade = 1): void {
     if (!this.music || !this.ctx) return;
     const m = this.music;
-    m.gain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.4);
-    m.src.stop(this.ctx.currentTime + 1.5);
     this.music = null;
+    window.clearTimeout(m.timer);
+    m.gain.gain.setTargetAtTime(0, this.ctx.currentTime, fade / 3);
+    for (const src of m.sources) { try { src.stop(this.ctx.currentTime + fade + 0.1); } catch { /* already stopped */ } }
   }
 
+  get currentTrack(): string | null { return this.music?.url ?? null; }
   get hasMusic(): boolean { return this.music !== null; }
+  /** Sample pack + tracks loaded? (tracks are lazy; this is the sfx bank) */
+  get ready(): boolean { return this.total > 0 && this.loaded >= this.total; }
 }

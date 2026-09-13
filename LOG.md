@@ -69,3 +69,17 @@
 - 开始界面：封面 + 加载条 + Play/Watch/Settings + 控制说明 + 设置面板（画质/音量/鼠标/帧时间）+ 音乐状态；
   Esc 回菜单时主按钮变 Resume；设置存 localStorage。
 - 真机性能没法在无头里量（swiftshader 200 ms/帧），交给用户用「Show frame time」看。
+
+## 2026-09-13 — 开始界面重做 + Suno prompt
+
+- 用户：开始界面「有点廉价」；要 Suno 的 style prompt。
+- 廉价的来源：系统字体、居中卡片、标准按钮、静态海报当背景。改成游戏菜单的语法：左对齐大标题（专用展示字体）、
+  竖排菜单带侧边高亮条和悬停提示、右侧滑出面板、菜单后面是真实场景的 attract 模式（AI vs AI + 导演镜头慢转）。
+  封面图降级为加载 splash（1.4 s 淡出）。
+- BGM：无缝循环用两段重叠 2.5 s 交叉淡入实现；`menu.mp3`（可选）在第一次点击/按键时起，`bgm.mp3` 在 Play/Watch
+  时淡入；暂停时音乐压到 35%、音效静音；attract 时音效 10%。
+- Suno style prompt（给用户的版本）：
+  - 对局：`dark industrial synthwave, mid-tempo 118 BPM, heavy analog bass pulse, mechanical percussion,
+    metallic hits, tense arpeggios, cinematic sci-fi, instrumental, no vocals, steady energy, loopable, no fade out`
+  - 菜单：`dark ambient sci-fi, slow sub-bass pulse, cavernous hangar reverb, soft synth pads, sparse metallic
+    percussion, brooding, instrumental, no vocals, loopable, no build-ups`

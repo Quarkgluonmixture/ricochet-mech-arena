@@ -134,6 +134,14 @@ export class World {
     }
   }
 
+  /** New match: scores and round counter back to zero, then a fresh round. */
+  resetMatch(): void {
+    for (const m of this.mechs) { m.kills = 0; m.deaths = 0; }
+    this.round = 0;
+    this.time = 0;
+    this.resetRound();
+  }
+
   resetRound(): void {
     this.roundResetAt = -1;
     this.roundDecidedAt = -1;

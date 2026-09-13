@@ -4,11 +4,11 @@ import { CFG } from './sim/config.ts';
 import { type Vec2, forward, norm, right } from './sim/geom.ts';
 import type { MechInput } from './sim/mech.ts';
 import { World } from './sim/world.ts';
+import { TEX } from './render/assets.ts';
 import { CameraRig } from './render/camera.ts';
 import { Fx } from './render/fx.ts';
 import { HeadMarker } from './render/marker.ts';
 import { MechView } from './render/mech.ts';
-import { TEX } from './render/assets.ts';
 import { QUALITY } from './render/quality.ts';
 import { COLORS, createScene } from './render/scene.ts';
 import { ShellViews } from './render/shells.ts';
@@ -20,13 +20,15 @@ import { Radar } from './ui/radar.ts';
 import { loadSettings, saveSettings } from './ui/settings.ts';
 import { ThreatRing } from './ui/threat.ts';
 
+declare const __BUILD__: string;
+
 // ---- world ----------------------------------------------------------------------------------
 const arena = buildArena(MAP_A);
 const world = new World(arena);
 const player = world.addMech('you', true, arena.spawns.player, arena.spawnYaw.player);
 const enemy = world.addMech('AI', false, arena.spawns.enemy, arena.spawnYaw.enemy);
 const aiState: AiState = makeAiState(enemy.torsoYaw);
-/** Brain for the blue mech while spectating (AI vs AI). Same code as red. */
+/** Brain for the blue mech while spectating or in attract mode (AI vs AI). Same code as red. */
 const blueState: AiState = makeAiState(player.torsoYaw);
 
 // ---- render + ui ----------------------------------------------------------------------------
@@ -49,17 +51,76 @@ const threat = new ThreatRing(document.getElementById('threat') as HTMLCanvasEle
 const audio = new Audio();
 audio.setVolumes(settings.sfx, settings.music);
 hud.setCamMode(rig.mode);
-hud.setKeyArt(TEX.keyart);
+hud.setSplash(TEX.keyart);
+hud.setBuild(`build ${__BUILD__}`);
+hud.menuHoverSync();
 
-// ---- start screen: preload, settings panel, music ---------------------------------------------
-const MUSIC_URL = 'audio/bgm.mp3';
-void audio.preload().then(() => hud.setLoading(audio.loaded, audio.total));
+// ---- modes ----------------------------------------------------------------------------------
+const MUSIC = { menu: 'audio/menu.mp3', game: 'audio/bgm.mp3' };
+let locked = false;
+let spectating = false;
+/** Attract mode: AI vs AI behind the menu, HUD hidden, effects muted. On until the first Play/Watch. */
+let attract = false;
+let gameStarted = false;
+let dragging = false;
+let yaw = player.torsoYaw;
+let firePressed = false;
+let fireHeld = false;
+let dashPressed = false;
+const keys = new Set<string>();
+const SENS = 0.0022; // × settings.sensitivity
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
+
+function applyDuck(): void {
+  const paused = hud.overlayVisible;
+  audio.setDuck(attract ? 0.1 : paused ? 0 : 1, paused && !attract ? 0.35 : 1);
+}
+
+function setAttract(on: boolean): void {
+  if (attract === on) return;
+  attract = on;
+  hud.setAttract(on);
+  spec.autoOrbit = on ? 0.05 : 0;
+  rig.setViewmodelVisible(!on); // the cockpit gun is parented to the camera; the director cam must not carry it
+  if (on) { spec.reset(); blueState.round = -1; aiState.round = -1; }
+  applyDuck();
+}
+
+function setSpectate(on: boolean): void {
+  if (spectating === on) return;
+  spectating = on;
+  hud.setSpectate(on);
+  if (on) {
+    setAttract(false);
+    if (document.pointerLockElement) document.exitPointerLock();
+    hud.setOverlay(false);
+    spec.reset();
+    blueState.round = -1;
+    for (const m of world.mechs) { m.maxShells = CFG.spectate.maxShells; m.fireCooldown = CFG.spectate.fireCooldown; }
+    rig.setViewmodelVisible(false);
+  } else {
+    player.maxShells = CFG.player.maxShells; player.fireCooldown = CFG.player.fireCooldown;
+    enemy.maxShells = CFG.ai.maxShells; enemy.fireCooldown = CFG.ai.fireCooldown;
+    yaw = player.torsoYaw;
+    rig.pitch = 0;
+    hud.setOverlay(!locked, gameStarted);
+    if (!gameStarted) setAttract(true);
+  }
+  applyDuck();
+}
+
+/** Both mechs on the AI brain (spectator and attract). */
+const aiVsAi = () => spectating || attract;
+
+// ---- start screen: preload, settings, music -------------------------------------------------
+void audio.preload();
+const splashTimer = window.setTimeout(() => hud.hideSplash(), 6000);
 const loadingTick = setInterval(() => {
   hud.setLoading(audio.loaded, audio.total);
-  if (audio.total > 0 && audio.loaded >= audio.total) clearInterval(loadingTick);
+  if (audio.ready) { clearInterval(loadingTick); window.clearTimeout(splashTimer); window.setTimeout(() => hud.hideSplash(), 400); }
 }, 100);
 
-const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const setQ = $<HTMLSelectElement>('set-quality');
 const setSfx = $<HTMLInputElement>('set-sfx');
 const setMusic = $<HTMLInputElement>('set-music');
@@ -88,49 +149,33 @@ $('settings-btn').addEventListener('click', () => { audio.unlock(); audio.ui('cl
 $('settings-close').addEventListener('click', () => { audio.ui('back'); hud.showSettings(false); });
 applySettings();
 
-let musicTried = false;
-function startMusic(): void {
-  if (musicTried) return;
-  musicTried = true;
-  void audio.startMusic(MUSIC_URL).then((ok) => hud.setMusicStatus(ok ? 'Music: your track, looping.' : 'No music track found — add public/audio/bgm.mp3.'));
+let musicPhase: 'none' | 'menu' | 'game' = 'none';
+async function music(phase: 'menu' | 'game'): Promise<void> {
+  if (musicPhase === phase) return;
+  musicPhase = phase;
+  const url = phase === 'game' ? MUSIC.game : MUSIC.menu;
+  const ok = await audio.playTrack(url);
+  if (!ok && phase === 'game') { /* no game track: keep whatever is playing (menu track or silence) */ }
+  const cur = audio.currentTrack;
+  hud.setMusicStatus(cur ? `music · ${cur.split('/').pop()}` : 'music · none');
 }
+// the first gesture anywhere unlocks audio and starts the menu track (browsers block earlier starts)
+const firstGesture = () => { audio.unlock(); if (musicPhase === 'none') void music('menu'); };
+document.addEventListener('pointerdown', firstGesture, { once: true });
+document.addEventListener('keydown', firstGesture, { once: true });
 
 // ---- input ----------------------------------------------------------------------------------
-const keys = new Set<string>();
-let yaw = player.torsoYaw;
-let firePressed = false;
-let fireHeld = false;
-let dashPressed = false;
-let locked = false;
-let spectating = false;
-let dragging = false;
-const SENS = 0.0022; // × settings.sensitivity
-
-function setSpectate(on: boolean): void {
-  if (spectating === on) return;
-  spectating = on;
-  hud.setSpectate(on);
-  if (on) {
-    if (document.pointerLockElement) document.exitPointerLock();
-    hud.setOverlay(false);
-    spec.reset();
-    blueState.round = -1; // resync its torso to the mech on the first think
-    for (const m of world.mechs) { m.maxShells = CFG.spectate.maxShells; m.fireCooldown = CFG.spectate.fireCooldown; }
-    rig.setViewmodelVisible(false);
-  } else {
-    player.maxShells = CFG.player.maxShells; player.fireCooldown = CFG.player.fireCooldown;
-    enemy.maxShells = CFG.ai.maxShells; enemy.fireCooldown = CFG.ai.fireCooldown;
-    yaw = player.torsoYaw;
-    rig.pitch = 0;
-    hud.setOverlay(!locked, world.time > 0);
-  }
-}
-const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space') e.preventDefault();
   if (e.repeat) return;
   keys.add(e.code);
+  // menu keyboard navigation
+  if (hud.overlayVisible && !locked && !spectating) {
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') { hud.menuMove(1); audio.ui('click'); return; }
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') { hud.menuMove(-1); audio.ui('click'); return; }
+    if (e.code === 'Enter') { hud.menuActivate(); return; }
+    if (e.code === 'Escape') { hud.showSettings(false); return; }
+  }
   if (e.code === 'KeyT') { setSpectate(!spectating); return; }
   if (spectating) {
     if (e.code === 'Escape') setSpectate(false);
@@ -160,18 +205,22 @@ document.addEventListener('mouseup', (e) => { if (e.button === 0) { fireHeld = f
 document.addEventListener('wheel', (e) => { if (spectating) spec.zoomBy(e.deltaY > 0 ? 1.12 : 0.89); }, { passive: true });
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === renderer.domElement;
-  hud.setOverlay(!locked, world.time > 0);
+  hud.setOverlay(!locked, gameStarted);
   if (!locked) { keys.clear(); fireHeld = false; hud.showSettings(false); }
+  applyDuck();
 });
+
 const play = () => {
   audio.unlock();
   audio.ui('confirm');
-  startMusic();
+  void music('game');
+  setAttract(false);
+  if (!gameStarted) { world.resetMatch(); yaw = player.torsoYaw; rig.pitch = 0; gameStarted = true; }
   renderer.domElement.requestPointerLock();
 };
 $('play').addEventListener('click', play);
-$('watch').addEventListener('click', () => { audio.unlock(); audio.ui('confirm'); startMusic(); setSpectate(true); });
-view.addEventListener('click', () => { if (!locked && !spectating) play(); });
+$('watch').addEventListener('click', () => { audio.unlock(); audio.ui('confirm'); void music('game'); if (!gameStarted) world.resetMatch(); setSpectate(true); });
+view.addEventListener('click', () => { if (!locked && !spectating && !hud.overlayVisible) play(); });
 
 function playerInput(): MechInput {
   const f = forward(yaw), r = right(yaw);
@@ -219,6 +268,7 @@ function handleEvents(): void {
       case 'hit': {
         audio.hit(e.pos);
         fx.hit(e.pos.x, e.pos.z, e.victim === player.id ? COLORS.you : COLORS.ai);
+        if (attract) break;
         if (spectating) {
           const own = e.shooter === e.victim;
           const how = own ? 'Its own ricochet came back.' : e.bounces > 0 ? `Bank shot from ${bearingWord(e.vel)}.` : 'Direct hit.';
@@ -237,7 +287,7 @@ function handleEvents(): void {
         rig.pitch = 0;
         enemyTrail.reset();
         playerTrail.reset();
-        audio.round();
+        if (!attract) audio.round();
         break;
       default:
         break;
@@ -253,7 +303,7 @@ let frameMs = 16;
 let fpsTimer = 0;
 
 function simStep(input: MechInput | null): void {
-  const blue = spectating ? aiThink(world, player, enemy, blueState, STEP) : input;
+  const blue = aiVsAi() ? aiThink(world, player, enemy, blueState, STEP) : input;
   world.step(STEP, [blue, aiThink(world, enemy, player, aiState, STEP)]);
   handleEvents();
 }
@@ -265,25 +315,26 @@ function frame(now: number): void {
   frameMs += (raw - frameMs) * 0.08;
   fpsTimer += dt;
   if (settings.showFps && fpsTimer > 0.4) { fpsTimer = 0; hud.setFps(frameMs); }
-  if (locked || spectating) {
+  if (locked || spectating || attract) {
     acc += dt;
-    while (acc >= STEP) { simStep(spectating ? null : playerInput()); acc -= STEP; }
+    while (acc >= STEP) { simStep(aiVsAi() ? null : playerInput()); acc -= STEP; }
   }
   playerView.update(player, dt);
   enemyView.update(enemy, dt);
-  playerView.root.visible = player.alive && (rig.mode === 'third' || spectating);
+  playerView.root.visible = player.alive && (rig.mode === 'third' || aiVsAi());
   shellViews.sync(world.shells);
   fx.update(dt);
-  if (spectating) spec.update(player, enemy, dt); else rig.update(player, dt);
+  if (aiVsAi()) spec.update(player, enemy, dt); else rig.update(player, dt);
   enemyMarker.update(enemy, camera, dt);
   playerMarker.update(player, camera, dt);
   playerMarker.setVisible(spectating);
+  enemyMarker.setVisible(!attract);
   enemyTrail.update(enemy, dt);
   playerTrail.update(player, dt);
-  if (spectating) audio.setListener({ x: camera.position.x, z: camera.position.z }, spec.yaw());
+  if (aiVsAi()) audio.setListener({ x: camera.position.x, z: camera.position.z }, spec.yaw());
   else audio.setListener(player.pos, player.torsoYaw);
   audio.syncHums(world.shells, player.id);
-  if (!spectating) {
+  if (!aiVsAi()) {
     radar.draw(world, player, enemy);
     const hfov = 2 * Math.atan(Math.tan((camera.fov * Math.PI) / 360) * camera.aspect);
     threat.draw(world, player, enemy, rig.mode === 'first' ? hfov / 2 : Math.PI * 0.4);
@@ -293,6 +344,7 @@ function frame(now: number): void {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+setAttract(true);
 if (new URLSearchParams(location.search).has('spectate')) setSpectate(true);
 
 // ---- headless probe (screenshots, tests in a real browser) ----------------------------------
@@ -300,6 +352,7 @@ declare global { interface Window { rma: unknown } }
 window.rma = {
   world, player, enemy, aiState, blueState, CFG, rig, spec, hud, stats,
   spectate(on: boolean): void { setSpectate(on); },
+  attract(on: boolean): void { setAttract(on); },
   /** Run the sim for `seconds` with a scripted player input, without pointer lock. */
   drive(seconds: number, input: Partial<MechInput> = {}): void {
     const n = Math.round(seconds / STEP);
@@ -310,11 +363,12 @@ window.rma = {
   },
   probe() {
     return {
-      time: world.time, round: world.round, shells: world.shells.length, locked, spectating, mode: spectating ? `spectate:${spec.mode}` : rig.mode,
+      time: world.time, round: world.round, shells: world.shells.length, locked, spectating, attract, gameStarted,
+      mode: spectating ? `spectate:${spec.mode}` : attract ? 'attract' : rig.mode,
       player: { pos: player.pos, alive: player.alive, kills: player.kills, deaths: player.deaths },
       enemy: { pos: enemy.pos, alive: enemy.alive, kills: enemy.kills, deaths: enemy.deaths },
       aiSafe: aiState.lastSafe, aiCandidates: aiState.lastCandidates, aiSolution: aiState.solution, stats: { ...stats, fires: [...stats.fires] },
-      drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
+      drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, music: audio.currentTrack,
     };
   },
 };

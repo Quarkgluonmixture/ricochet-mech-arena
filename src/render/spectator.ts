@@ -12,6 +12,8 @@ const angleDiff = (a: number, b: number) => { let d = (b - a) % (Math.PI * 2); i
  */
 export class SpectatorCamera {
   mode: SpecMode = 'director';
+  /** rad/s of continuous orbit (attract mode behind the menu). */
+  autoOrbit = 0;
   private camera: THREE.PerspectiveCamera;
   private theta = 0;
   private thetaOffset = 0;
@@ -35,6 +37,7 @@ export class SpectatorCamera {
   }
 
   update(a: Mech, b: Mech, dt: number): void {
+    this.thetaOffset += this.autoOrbit * dt;
     const mx = (a.pos.x + b.pos.x) / 2, mz = (a.pos.z + b.pos.z) / 2;
     const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z;
     const sep = Math.hypot(dx, dz);

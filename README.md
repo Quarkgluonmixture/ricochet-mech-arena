@@ -54,8 +54,10 @@ Open `?spectate` in the URL to start in spectator mode.
 - Sound: Kenney CC0 samples (fire, ricochet, explosion, dash, engine hum per live shell, UI) with a
   synthesised sub-thump under each shot, positioned by bearing and distance, sent through a shared reverb
   and summed into a compressor. Credits in `public/audio/sfx/CREDITS.txt`.
-- Music: drop a looping track at `public/audio/bgm.mp3` (Suno or anything else). It fades in on Play or
-  Watch and loops; the volume slider is in Settings. No file, no music, no error.
+- Music: drop a track at `public/audio/bgm.mp3` (Suno or anything else) and optionally `menu.mp3` for the
+  start screen. Tracks loop by crossfading the last 2.5 s of one pass into the next, so any exported song
+  loops without a click or a gap. The menu track starts on the first click or key, the game track fades in
+  on Play or Watch, music ducks while paused. No file, no music, no error.
 - Art: six generated images (floor, wall side, wall top, mech hull, hangar sky, key art) made with the
   Codex image tool from the prompts in `assets-src/PROMPTS.md`; originals in `assets-src/`, the JPEGs the
   game loads in `public/textures/` (`scripts/convert-assets.sh`). Textures tile at fixed metric sizes
@@ -65,7 +67,10 @@ Open `?spectate` in the URL to start in spectator mode.
 
 ## Start screen and settings
 
-The start card doubles as the pause menu (Esc). Settings persist in `localStorage`:
+The menu runs over a live attract mode: both mechs on the AI brain, the director camera slowly orbiting,
+effects muted. The key art shows as a splash until the sound bank is in. Arrow keys or W/S move the
+highlight, Enter selects. The same screen is the pause menu (Esc), with Play becoming Resume. Fonts are
+self-hosted Chakra Petch and Rajdhani (OFL, `public/fonts/CREDITS.txt`). Settings persist in `localStorage`:
 
 | Setting | What it changes |
 |---|---|

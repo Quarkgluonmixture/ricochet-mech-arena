@@ -31,24 +31,42 @@ export class Hud {
     }
   }
 
-  private playBtn = $<HTMLButtonElement>('play');
+  private playLabel = document.querySelector('#play .label') as HTMLElement;
   private loading = $('loading');
   private loadingBar = $('loading-bar');
   private loadingText = $('loading-text');
   private settingsPanel = $('settings');
   private musicStatus = $('music-status');
   private fps = $('fps');
+  private splash = $('splash');
+  private items = Array.from(document.querySelectorAll<HTMLButtonElement>('#menu-list .item'));
 
-  /** Show the menu. `inProgress` turns the primary button into Resume. */
+  /** Show the menu. `inProgress` turns the primary item into Resume. */
   setOverlay(visible: boolean, inProgress = false): void {
     this.overlay.classList.toggle('hidden', !visible);
-    if (visible) this.playBtn.textContent = inProgress ? 'Resume' : 'Play';
+    if (visible) this.playLabel.textContent = inProgress ? 'Resume' : 'Play';
+  }
+  get overlayVisible(): boolean { return !this.overlay.classList.contains('hidden'); }
+  /** Attract mode: the live AI-vs-AI scene runs behind the menu with the HUD hidden. */
+  setAttract(on: boolean): void { this.hud.classList.toggle('attract', on); }
+  setSplash(url: string): void { this.splash.style.backgroundImage = `url('${url}')`; }
+  hideSplash(): void { this.splash.classList.add('gone'); }
+  setBuild(text: string): void { $('build').textContent = text; }
+  /** Keyboard navigation of the menu list. */
+  menuMove(dir: 1 | -1): void {
+    const i = this.items.findIndex((b) => b.classList.contains('is-active'));
+    const n = (i + dir + this.items.length) % this.items.length;
+    this.items.forEach((b, k) => b.classList.toggle('is-active', k === n));
+  }
+  menuActivate(): void { this.items.find((b) => b.classList.contains('is-active'))?.click(); }
+  menuHoverSync(): void {
+    for (const b of this.items) b.addEventListener('mouseenter', () => this.items.forEach((o) => o.classList.toggle('is-active', o === b)));
   }
   setLoading(loaded: number, total: number): void {
     const done = total > 0 && loaded >= total;
     this.loading.classList.toggle('done', done);
     this.loadingBar.style.width = total > 0 ? `${Math.round((loaded / total) * 100)}%` : '0%';
-    this.loadingText.textContent = done ? '' : `Loading sounds… ${loaded}/${total}`;
+    this.loadingText.textContent = done ? '' : `Loading ${loaded}/${total}`;
   }
   showSettings(on: boolean): void { this.settingsPanel.classList.toggle('hidden', !on); }
   setMusicStatus(text: string): void { this.musicStatus.textContent = text; }
@@ -56,8 +74,7 @@ export class Hud {
     this.fps.classList.toggle('show', ms !== null);
     if (ms !== null) this.fps.textContent = `${ms.toFixed(1)} ms · ${Math.round(1000 / Math.max(ms, 0.1))} fps`;
   }
-  /** Key art behind the start card. A relative URL so it works in dev and under the Pages sub-path. */
-  setKeyArt(url: string): void { this.overlay.style.backgroundImage = `linear-gradient(rgba(6,8,12,0.45), rgba(6,8,12,0.8)), url('${url}')`; }
+
   setSpectate(on: boolean): void { this.hud.classList.toggle('spectate', on); }
   setCamMode(mode: string): void { this.camMode.textContent = mode === 'first' ? '1st · V' : '3rd · V'; }
 

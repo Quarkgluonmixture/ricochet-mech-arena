@@ -4,6 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Ricochet Mech Arena</title>
+  <style>
+    /* Self-hosted OFL fonts (public/fonts/CREDITS.txt). Declared here, not in the bundled CSS, so the
+       document-relative URLs work in dev and under the Pages sub-path alike. */
+    @font-face { font-family: 'Chakra Petch'; font-weight: 700; font-display: swap; src: url(fonts/chakra-petch-700.woff2) format('woff2'); }
+    @font-face { font-family: 'Chakra Petch'; font-weight: 600; font-display: swap; src: url(fonts/chakra-petch-600.woff2) format('woff2'); }
+    @font-face { font-family: 'Rajdhani'; font-weight: 600; font-display: swap; src: url(fonts/rajdhani-600.woff2) format('woff2'); }
+    @font-face { font-family: 'Rajdhani'; font-weight: 500; font-display: swap; src: url(fonts/rajdhani-500.woff2) format('woff2'); }
+  </style>
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
@@ -25,31 +33,38 @@
       <div id="spec-help">AI vs AI &nbsp;·&nbsp; drag to orbit &nbsp;·&nbsp; wheel to zoom &nbsp;·&nbsp; <b>V</b> top-down &nbsp;·&nbsp; <b>Esc</b> back to the cockpit</div>
     </div>
     <div id="overlay">
-      <div class="card">
-        <h1>Ricochet Mech Arena</h1>
-        <p class="lede">Direct shots never land on it. It moves exactly as fast as you do, and no faster. Bounce shells off walls, corner it, make two shells meet. It will do the same to you.</p>
-        <div id="loading"><span id="loading-text">Loading sounds…</span><div class="bar"><i id="loading-bar"></i></div></div>
-        <div class="buttons">
-          <button id="play" class="primary">Play</button>
-          <button id="watch" class="secondary">Watch AI vs AI</button>
-          <button id="settings-btn" class="secondary">Settings</button>
-        </div>
-        <ul class="controls" id="controls">
-          <li><b>Mouse</b> aim &nbsp; <b>Click</b> fire &nbsp; <b>W A S D</b> move &nbsp; <b>Shift</b> / <b>Space</b> dash</li>
-          <li><b>V</b> first ↔ third person &nbsp; <b>R</b> reset round &nbsp; <b>Esc</b> menu &nbsp; <b>T</b> watch AI vs AI</li>
+      <div id="splash"></div>
+      <div class="scan"></div>
+      <section class="menu-left">
+        <header class="brand">
+          <div class="eyebrow">A duel of geometry</div>
+          <h1><span>Ricochet</span><span>Mech Arena</span></h1>
+          <p class="lede">Direct shots never land on it. It moves exactly as fast as you do, and no faster. Bounce a shell off a wall, corner it, make two shells meet. It does the same to you.</p>
+        </header>
+        <nav class="menu-list" id="menu-list" aria-label="Main menu">
+          <button id="play" class="item is-active"><span class="idx">01</span><span class="label">Play</span><span class="hint">first person · Esc opens this menu</span></button>
+          <button id="watch" class="item"><span class="idx">02</span><span class="label">Watch AI vs AI</span><span class="hint">both mechs on the same brain</span></button>
+          <button id="settings-btn" class="item"><span class="idx">03</span><span class="label">Settings</span><span class="hint">quality · sound · mouse</span></button>
+        </nav>
+        <div id="loading"><i id="loading-bar"></i><span id="loading-text">Loading</span></div>
+        <ul class="keys">
+          <li><kbd>W A S D</kbd>move</li><li><kbd>Mouse</kbd>aim</li><li><kbd>Click</kbd>fire</li><li><kbd>Shift</kbd>dash</li>
+          <li><kbd>V</kbd>camera</li><li><kbd>T</kbd>spectate</li><li><kbd>R</kbd>reset</li>
         </ul>
-        <div id="settings" class="hidden">
-          <label><span>Quality</span>
-            <select id="set-quality"><option value="low">Low — no bloom, no shadows</option><option value="medium">Medium</option><option value="high">High — full Retina, 4x MSAA</option></select>
-          </label>
-          <label><span>Effects</span><input id="set-sfx" type="range" min="0" max="1" step="0.05" /></label>
-          <label><span>Music</span><input id="set-music" type="range" min="0" max="1" step="0.05" /></label>
-          <label><span>Mouse</span><input id="set-sens" type="range" min="0.3" max="3" step="0.1" /></label>
-          <label class="check"><input id="set-fps" type="checkbox" /><span>Show frame time</span></label>
-          <div class="buttons"><button id="settings-close" class="secondary">Done</button></div>
-        </div>
-        <p class="credits">Sound effects by Kenney (CC0). <span id="music-status">No music track found — add <code>public/audio/bgm.mp3</code>.</span></p>
-      </div>
+        <footer class="foot"><span id="build">—</span><span>sound · Kenney CC0</span><span id="music-status">music · none</span></footer>
+      </section>
+      <aside id="settings" class="panel hidden" aria-label="Settings">
+        <h2>Settings</h2>
+        <label><span>Quality</span>
+          <select id="set-quality"><option value="low">Low · no bloom, no shadows</option><option value="medium">Medium</option><option value="high">High · full Retina, 4x MSAA</option></select>
+        </label>
+        <label><span>Effects</span><input id="set-sfx" type="range" min="0" max="1" step="0.05" /></label>
+        <label><span>Music</span><input id="set-music" type="range" min="0" max="1" step="0.05" /></label>
+        <label><span>Mouse</span><input id="set-sens" type="range" min="0.3" max="3" step="0.1" /></label>
+        <label class="check"><input id="set-fps" type="checkbox" /><span>Show frame time</span></label>
+        <p class="note">Music: put a looping track at <code>public/audio/bgm.mp3</code>, optionally <code>menu.mp3</code> for this screen.</p>
+        <button id="settings-close" class="ghost">Done</button>
+      </aside>
     </div>
     <div id="fps"></div>
   </div>
