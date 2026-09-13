@@ -117,6 +117,21 @@ export class Audio {
     void this.preload();
   }
 
+  /**
+   * Try to start audio WITHOUT a gesture. Browsers allow it only for sites the user has engaged with
+   * before (Chrome's media engagement); otherwise the context stays suspended and we return false.
+   */
+  async tryAutostart(): Promise<boolean> {
+    const ctx = this.ensure();
+    if (ctx.state === 'running') return true;
+    try { await ctx.resume(); } catch { /* blocked */ }
+    // resume() can resolve while the context is still suspended; the state is the truth
+    await new Promise((r) => setTimeout(r, 50));
+    return (ctx.state as AudioContextState) === 'running';
+  }
+
+  get running(): boolean { return this.ctx?.state === 'running'; }
+
   setVolumes(sfx: number, music: number): void {
     this.volumes = { sfx, music };
     if (!this.ctx) return;

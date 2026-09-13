@@ -225,13 +225,19 @@ async function music(phase: 'menu' | 'game'): Promise<void> {
   if (musicPhase === phase) return;
   musicPhase = phase;
   const track = phase === 'game' ? MUSIC.game : MUSIC.menu;
-  await audio.playTrack(track.url, 2, { start: track.start, loopStart: track.loopStart });
+  // the menu track eases in over 4 s: it is the first thing you hear when the page opens
+  await audio.playTrack(track.url, phase === 'menu' ? 4 : 2, { start: track.start, loopStart: track.loopStart });
   const cur = audio.currentTrack;
   hud.setMusicStatus(cur ? t('music.track', { name: cur.split('/').pop() ?? '' }) : t('music.none'));
 }
+// Menu music should be playing the moment the site opens. Browsers only allow that for sites you have
+// used before; try, and if the context stays suspended fall back to the first click or key.
 const firstGesture = () => { audio.unlock(); if (musicPhase === 'none') void music('menu'); };
-document.addEventListener('pointerdown', firstGesture, { once: true });
-document.addEventListener('keydown', firstGesture, { once: true });
+void audio.tryAutostart().then((ok) => {
+  if (ok) { if (musicPhase === 'none') void music('menu'); return; }
+  document.addEventListener('pointerdown', firstGesture, { once: true });
+  document.addEventListener('keydown', firstGesture, { once: true });
+});
 
 // ---- input ----------------------------------------------------------------------------------
 document.addEventListener('keydown', (e) => {

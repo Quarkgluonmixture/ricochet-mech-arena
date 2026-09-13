@@ -2,6 +2,7 @@
 
 ## 现场（截至 2026-09-13 深夜）
 
+- 机甲之间有碰撞体积（含队友），AI 预演把别的机甲当障碍；菜单音乐开站即尝试渐入。
 - **线上可玩**：<https://quarkgluonmixture.github.io/ricochet-mech-arena/>。默认 3v3 团队战（设置可切 1v1/2v2）、
   默认中文、人 3 命 / AI 1 命、Codex 生图素材 + 按概念图重建的机甲、Kenney 采样音效 + 两首 Suno 曲、
   attract 菜单、观战模式、击杀播报。规则与操作以 `README.md` 为准。
@@ -17,6 +18,8 @@
 2. 读 `docs/VISION.md`（短，全文；§3 平面锁定、§4 人机契约、§4c 三条命、§6 素材规则是承重的）。
 3. `npm install && npm run dev`，进菜单先看 30 秒 attract，再按「开始」玩两回合。
 4. 要改人机：`src/sim/ai.ts`；要改美术：`src/render/`；文案：`src/ui/i18n.ts`（⛔ 别在别处写死字符串）。
+   中文由 Gemini 3.8 Flash 按「国产游戏说法」重写过（术语：跳弹 / 击毁 / 友军误伤 / 规避路径），加新文案沿用这套词；
+   要整表重写：把 EN+ZH 表内联进 brief，`agy --model gemini-3.8-flash-high --output-format json --json-schema <85键 schema> --print "$P"`。
 
 ## Ops 速查
 

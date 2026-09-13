@@ -51,6 +51,8 @@ kill and how it landed. Spawns: `P`/`B` blue, `E`/`R` red in the arena map.
   The score counts rounds won: your kills, plus rounds the other side handed over with an own goal.
 - A shell leaves 1.13 m ahead of the mech, or just short of a wall if one is closer, so it can never be
   born inside a wall. Firing point-blank into a wall is an own goal.
+- Mechs have volume: they push off each other (teammates included) and never overlap; the AI's dodge
+  search treats every other mech as an obstacle.
 - The AI has exactly your movement model (`stepMotion` in `src/sim/mech.ts` is the only one), 2 shells
   in flight, one shot per second at most. Its torso rides on its legs (turning the body swings the aim),
   slews back at 7 rad/s, and cannot aim more than 100° off the body; standing still, the legs turn in place
@@ -95,7 +97,7 @@ self-hosted Chakra Petch and Rajdhani (OFL, `public/fonts/CREDITS.txt`). Setting
 
 | Setting | What it changes |
 |---|---|
-| Language | Chinese (default) or English; every menu, settings and HUD string comes from `src/ui/i18n.ts`. |
+| Language | Chinese (default) or English; every menu, settings and HUD string comes from `src/ui/i18n.ts`. The Chinese copy was rewritten by Gemini 3.8 Flash (via `agy`) in the register of domestic Chinese games. |
 | Quality | Low: no bloom, no shadows, 1x pixels. Medium (default): 1.25x pixels, 2x MSAA, bloom, 1024 shadows, 4 shell lights. High: full Retina, 4x MSAA, 2048 shadows, 6 shell lights. |
 | Effects / Music | Bus volumes. |
 | Mouse | Sensitivity multiplier. |

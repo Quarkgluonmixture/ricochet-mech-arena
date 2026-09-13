@@ -7,6 +7,23 @@ import { World } from '../src/sim/world.ts';
 const DT = 1 / 120;
 const idle = (yaw: number) => ({ move: { x: 0, z: 0 }, torsoYaw: yaw, dash: false, fire: false });
 
+describe('mech collision', () => {
+  it('two mechs walking into each other stop at touching distance instead of overlapping', () => {
+    const rows = ['###########', '#P.......E#', '###########'];
+    const world = new World(buildArena(rows));
+    const a = world.addMech('a', true, world.arena.spawns.player, 0, 'blue');
+    const b = world.addMech('b', false, world.arena.spawns.enemy, 0, 'red');
+    a.maxShells = 0; b.maxShells = 0;
+    for (let t = 0; t < 6; t += DT) {
+      world.step(DT, [{ move: { x: 1, z: 0 }, torsoYaw: a.torsoYaw, dash: false, fire: false }, { move: { x: -1, z: 0 }, torsoYaw: b.torsoYaw, dash: false, fire: false }]);
+      const d = Math.hypot(a.pos.x - b.pos.x, a.pos.z - b.pos.z);
+      expect(d).toBeGreaterThanOrEqual(a.radius + b.radius - 1e-6);
+    }
+    const d = Math.hypot(a.pos.x - b.pos.x, a.pos.z - b.pos.z);
+    expect(d).toBeLessThan(a.radius + b.radius + 0.2); // they met and are pressed together
+  });
+});
+
 describe('teams', () => {
   it('parses P/B and E/R spawns into two teams with facing yaws', () => {
     const a = buildArena();

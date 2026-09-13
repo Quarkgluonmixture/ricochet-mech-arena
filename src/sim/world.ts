@@ -1,6 +1,6 @@
 import { CFG } from './config.ts';
 import { type Arena, buildArena } from './arena.ts';
-import { type Aabb, type Vec2, add, expandAll, forward, pointSegmentDist, raycast, scale } from './geom.ts';
+import { type Aabb, type Vec2, add, expandAll, forward, pointSegmentDist, raycast, resolveCircle, scale } from './geom.ts';
 import { type Mech, type MechInput, type Team, makeMech, stepMech } from './mech.ts';
 import { type BounceEvent, type Shell, advanceShell } from './shell.ts';
 
@@ -60,9 +60,25 @@ export class World {
     for (const m of this.mechs) {
       if (!m.alive) continue;
       const input = inputs[m.id] ?? { move: { x: 0, z: 0 }, torsoYaw: m.torsoYaw, dash: false, fire: false };
-      const r = stepMech(m, input, dt, this.walls);
+      const others = this.mechs.filter((o) => o.alive && o.id !== m.id);
+      const r = stepMech(m, input, dt, this.walls, others);
       if (r.dashed) this.events.push({ kind: 'dash', pos: { ...m.pos }, mech: m.id });
       if (input.fire && m.fireCd <= 0 && m.shellsOut < m.maxShells) this.fire(m);
+    }
+
+    // settle any remaining mutual overlap symmetrically (two mechs walking into each other)
+    for (let i = 0; i < this.mechs.length; i++) for (let j = i + 1; j < this.mechs.length; j++) {
+      const a = this.mechs[i], b = this.mechs[j];
+      if (!a.alive || !b.alive) continue;
+      const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z;
+      const d = Math.hypot(dx, dz);
+      const minD = a.radius + b.radius;
+      if (d >= minD || d < 1e-6) continue;
+      const half = (minD - d) / 2, nx = dx / d, nz = dz / d;
+      a.pos = { x: a.pos.x - nx * half, z: a.pos.z - nz * half };
+      b.pos = { x: b.pos.x + nx * half, z: b.pos.z + nz * half };
+      resolveCircle(a.pos, a.radius, this.walls);
+      resolveCircle(b.pos, b.radius, this.walls);
     }
 
     const bounces: BounceEvent[] = [];

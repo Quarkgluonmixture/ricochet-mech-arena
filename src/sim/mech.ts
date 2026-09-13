@@ -60,13 +60,15 @@ export function makeMech(id: number, name: string, isPlayer: boolean, pos: Vec2,
 
 /** Lightweight copy of the motion state, for the AI's candidate simulations. */
 export interface MotionState { pos: Vec2; vel: Vec2; dashT: number; dashCd: number; dashDir: Vec2 }
+/** Another body to stay out of: mechs have volume, teammates included. */
+export interface Obstacle { pos: Vec2; radius: number }
 export const motionOf = (m: Mech): MotionState => ({ pos: { ...m.pos }, vel: { ...m.vel }, dashT: m.dashT, dashCd: m.dashCd, dashDir: { ...m.dashDir } });
 
 /**
  * The movement model. Player, AI and the AI's what-if candidates all go through this one function
  * (VISION §4). Returns the wall push normal (zero when free) and whether a dash started.
  */
-export function stepMotion(m: MotionState, move: Vec2, dash: boolean, dt: number, walls: Aabb[]): { dashed: boolean; wallContact: boolean } {
+export function stepMotion(m: MotionState, move: Vec2, dash: boolean, dt: number, walls: Aabb[], others: Obstacle[] = []): { dashed: boolean; wallContact: boolean } {
   const c = CFG.mech;
   let mag = len(move);
   if (mag > 1) { move = scale(move, 1 / mag); mag = 1; }
@@ -90,6 +92,19 @@ export function stepMotion(m: MotionState, move: Vec2, dash: boolean, dt: number
   m.dashCd = Math.max(0, m.dashCd - dt);
   m.pos = { x: m.pos.x + m.vel.x * dt, z: m.pos.z + m.vel.z * dt };
   const push = resolveCircle(m.pos, c.radius, walls);
+  // other mechs: push out of any overlap along the centre line (the world settles mutual overlaps after all moves)
+  for (const o of others) {
+    const dx = m.pos.x - o.pos.x, dz = m.pos.z - o.pos.z;
+    const d = Math.hypot(dx, dz);
+    const minD = c.radius + o.radius;
+    if (d >= minD || d < 1e-6) continue;
+    const nx = dx / d, nz = dz / d;
+    m.pos = { x: o.pos.x + nx * minD, z: o.pos.z + nz * minD };
+    push.x += nx; push.z += nz;
+    // and the wall check again, so a body cannot shove us into a wall
+    const p2 = resolveCircle(m.pos, c.radius, walls);
+    push.x += p2.x; push.z += p2.z;
+  }
   const contact = len(push) > 0;
   if (contact) {
     // cancel the velocity component driving into the wall; sliding along it is fine
@@ -102,9 +117,9 @@ export function stepMotion(m: MotionState, move: Vec2, dash: boolean, dt: number
 }
 
 /** Advance a real mech: motion, torso, legs, cooldowns. Fire is handled by the world. */
-export function stepMech(m: Mech, input: MechInput, dt: number, walls: Aabb[]): { dashed: boolean } {
+export function stepMech(m: Mech, input: MechInput, dt: number, walls: Aabb[], others: Obstacle[] = []): { dashed: boolean } {
   m.moveIntent = { ...input.move };
-  const r = stepMotion(m, input.move, input.dash, dt, walls);
+  const r = stepMotion(m, input.move, input.dash, dt, walls, others);
   m.torsoYaw = input.torsoYaw;
   m.fireCd = Math.max(0, m.fireCd - dt);
   m.invulnT = Math.max(0, m.invulnT - dt);

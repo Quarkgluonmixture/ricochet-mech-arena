@@ -131,6 +131,9 @@ export function pickTarget(world: World, self: Mech): Mech | null {
 export function planMove(world: World, self: Mech, target: Mech, st: AiState, wantsToShoot = false): { move: Vec2; dash: boolean; safe: number; total: number } {
   const A = CFG.ai;
   const mates = world.matesOf(self);
+  // other bodies as obstacles, frozen where they are now: good enough over a 1.5 s horizon and keeps the
+  // dodge search from planning a path through a teammate it would then be stopped by
+  const others = world.mechs.filter((o) => o.alive && o.id !== self.id).map((o) => ({ pos: o.pos, radius: o.radius }));
   const dt = A.predictDt;
   const steps = Math.ceil(A.horizon / dt);
   const hitR = self.radius + CFG.shell.radius + A.dodgeMargin;
@@ -156,7 +159,7 @@ export function planMove(world: World, self: Mech, target: Mech, st: AiState, wa
     let hitAt = -1;
     let contacts = 0;
     for (let k = 0; k < steps; k++) {
-      const r = stepMotion(m, c.move, c.dash && k === 0, dt, world.walls);
+      const r = stepMotion(m, c.move, c.dash && k === 0, dt, world.walls, others);
       if (r.wallContact) contacts++;
       for (const p of paths) {
         if (k >= p.length) continue;
