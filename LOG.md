@@ -180,3 +180,20 @@
 - 测试 +5（`tests/slowmo.test.ts`：卡在 <1 不回来、hold 时长、上下界、二次触发续接）；CLAUDE.md 的「测试只碰 sim」放宽为
   「sim + 不碰 DOM/three 的纯函数模块」。26 条全过，tsc 干净。
 - 下一步：真人验证（TODO 第一节，含慢镜头 5 问）→ 观赏性 3 地形美术。
+
+## [2026-09-14 12:05] 用户线上反馈三条：开站无声、慢放提前、默认 2v2  #ship #decision #measure #incident
+- **开站无声（quarkspace.top 首访）**：不是回归，是 Chrome autoplay 按 origin 放行、新域名首访必静音到第一次点击。代码路径本来就有
+  回退（pointerdown / keydown once）；这次只加了页脚提示「声音 · 点一下任意处开启」（`music.blocked`），被拦时代替曲名显示。
+  ⇒ GOTCHAS #19。⚠ 无头 Chromium 即使加 `--autoplay-policy=user-gesture-required` 也不拦 → 被拦路径**没能无头验证**，tsc 过、逻辑一处。
+- **慢放提前到命中前**（用户「再往前一点」）：新 `src/sim/predict.ts` 的 `predictImpacts(world, lead)` 每个模拟步把在飞炮弹按
+  `hitTest` 同一套墙 / 半径 / 自伤武装规则往前扫 0.12 s（机甲按当前速度外推），致命命中就先 `slowmo.trigger()` 并把 killcam 指向
+  受害者 + 射手；命中事件再 restart hold（0.85→0.7 s，因为 run-up 已占约 0.5 s 真实时间）。**AI 受害者只在 `lastSafe === 0` 时提前**
+  ——有安全走位的 AI 多半会躲，否则每几秒一次慢放 near miss。5 条测试（直线命中 / 超出 lead / 侧移躲开 / 撞墙先死 / 自伤武装 / 无敌 & 回合已定）。
+- 测量（无头，`drive` 逐步）：人类最后一命、炮弹 3 m 外直冲 → 提前触发 t=0.075、命中 t=0.192，**lead 0.1167 s**（目标 0.12）；
+  AI 受害者同样布置 → 全程 `aiSafe=15`，未提前、也躲开了，无误触发。观战里 60 s 墙钟只跑出 12 s 模拟且零击杀，**误报率未测**，交真人。
+- **观战阵容默认 2v2**（用户定，原 3v3）：`settings.ts` DEFAULTS 改 2，并加 VERSION=2 一次性迁移——每次保存都写整个对象，
+  从未碰过阵容的老访客也存着 3。实测：无存储 → 2；v1 存 3 → 2 并回写 v:2；v2 存 3 → 保持 3。
+- 顺手修的老 bug：`World.step` 开头清空 events，所以**直接调用** `resetRound()/resetMatch()`（R 键、Play、Watch）推进去的 `round`
+  事件从未被 `handleEvents` 处理——trail 不重置、yaw 不同步、击杀镜头残留到重生机上。抽出 `onRound()`，手动重置走
+  `resetRoundNow()/resetMatchNow()`。无头按 R：慢放 active → false、killcam → null。
+- 部署：重新 build → 重拷进 quarkspace 仓 `public/`。⚠ 那边 webhook 是否已修未知，push 后要看线上哈希。

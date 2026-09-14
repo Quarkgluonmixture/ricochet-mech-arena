@@ -4,7 +4,7 @@ Sole truth for stages. Other files point here; they do not copy this list.
 
 ## Current cursor
 
-**M3 — teams** shipped 2026-09-13 (3v3 default). M0–M2 partially folded in along the way; see LOG.
+**M3 — teams** shipped 2026-09-13; AI-vs-AI roster default 2v2 since 2026-09-14 (3v3 available). M0–M2 partially folded in along the way; see LOG.
 
 ## Stages
 

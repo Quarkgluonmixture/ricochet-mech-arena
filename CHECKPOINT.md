@@ -4,12 +4,16 @@
 
 - **线上可玩**：<https://quarkgluonmixture.github.io/ricochet-mech-arena/>。规则与操作以 `README.md` 为准。
   - **Play = 1v1 决斗（PvE 固定）**，人 3 命 / AI 1 命，命条在右上角。
-  - **观战 / attract = AI 对战**，阵容在设置「观战阵容」（默认 3v3）；队友会集火同一目标并从相差 90° 的方向进攻。
+  - **观战 / attract = AI 对战**，阵容在设置「观战阵容」（默认 2v2，2026-09-14 从 3v3 改；存过设置的老访客由 `settings.ts`
+    的 VERSION 2 迁移一次）；队友会集火同一目标并从相差 90° 的方向进攻。
   - 机甲之间有碰撞体积（含队友），AI 走位预演把别的机甲当障碍。
   - 默认中文（文案为 Gemini 3.8 Flash 重写版，术语见「接手」#4）；Codex 生图素材 + 按概念图重建的机甲；
     Kenney 采样音效 + 两首 Suno 曲，菜单曲开站即尝试渐入；击杀播报；attract 菜单。
-  - **击杀慢镜头**：每次击杀 ¼ 速约 1.3 s（真实秒），导演模式（观战 / attract / 玩家死后）镜头甩向残骸 + 击杀者；
+  - **击杀慢镜头**：¼ 速，**命中前 0.12 s（模拟秒）就开始**（`src/sim/predict.ts` 每步预测致命命中；AI 受害者只在
+    `lastSafe === 0` 时提前），命中后再 hold 0.7 s + 0.4 s 回正；导演模式（观战 / attract / 玩家死后）镜头甩向残骸 + 击杀者；
     黑边 + 字幕；音效变调、音乐低通。主循环两套时钟 `dt` / `sdt`（GOTCHAS #18）。
+  - **开站声音**：浏览器 autoplay 按 origin 放行，新域名第一次必静音到第一次点击（GOTCHAS #19）；被拦时页脚显示
+    「声音 · 点一下任意处开启」。
 - **cursor**：`docs/ROADMAP.md` → M3 已 ship；观赏性 2（击杀慢镜头）已 ship；下一步 = 观赏性 3（地形美术），见 `TODO.md`。
 - ⚠ **今天下午之后的改动没有一项经真人玩过**（矮墙之后的全部，含击杀慢镜头）。真人验证清单在 `TODO.md` 第一节，
   先让用户玩，再决定改什么。
@@ -48,7 +52,7 @@
   `public/audio/sfx/`；文件名表在 `src/ui/audio.ts` 的 `SFX`。
 - **音乐**：`public/audio/menu.mp3`、`bgm.mp3`；战斗曲 start/loopStart 偏移在 `src/main.ts` 的 `MUSIC`。
 - Node ≥ 22.6 直跑 TS：`erasableSyntaxOnly`，⛔ 构造器参数属性（`constructor(private x)`）不能用。
-- 测试：`npm test`（vitest，`src/sim/` + 纯函数的 `src/ui/slowmo.ts`，26 条）。改 AI 打分或几何后必跑；改渲染后必截图。
+- 测试：`npm test`（vitest，`src/sim/` + 纯函数的 `src/ui/slowmo.ts`，31 条）。改 AI 打分或几何后必跑；改渲染后必截图。
 
 ## 文档地图
 
