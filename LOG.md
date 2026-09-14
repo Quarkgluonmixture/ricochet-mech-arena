@@ -197,3 +197,14 @@
   事件从未被 `handleEvents` 处理——trail 不重置、yaw 不同步、击杀镜头残留到重生机上。抽出 `onRound()`，手动重置走
   `resetRoundNow()/resetMatchNow()`。无头按 R：慢放 active → false、killcam → null。
 - 部署：重新 build → 重拷进 quarkspace 仓 `public/`。⚠ 那边 webhook 是否已修未知，push 后要看线上哈希。
+
+## [2026-09-14 16:14] 开站 BGM 提前、战斗曲压 0.8  #ship #measure #decision #incident
+- 用户：「bgm 出来的快一点，现在先出激光射击音效，过了三秒才出 bgm；战斗 bgm 稍微减弱一点点」。
+- 量出来的原因有四层：menu.mp3 5.29 MB / 188 kbps 要整下整解才响；曲子开头 0–2 s mean −36.9 dB（2 s 后 −14 dB）；代码淡入 4 s；
+  attract 音效 duck 0.1 不等音乐（33 个 m4a 在 356 ms 内全到）。无头分解：fetch 344→6660 ms（dev server）、decode 到 13.9 s，环境值。
+- 改法：① `MUSIC.menu.start` 1.5 s、`fadeIn` 1 s；② 开页 `preloadTrack(menu)` → 完再 `preloadTrack(game)`；③ `applyDuck()` 在 attract 下
+  音效 = `hasMusic ? 0.1 : 0`，`music()` 播起后再 `applyDuck()`；④ 两首曲子 libmp3lame 128 kbps 重编：menu 5,285,372 → 3,598,124 B、
+  bgm 4,652,036 → 3,149,996 B（−32%），原件在 git 历史 `a8bdb0a:public/audio/*.mp3`。⑤ `playTrack` 加 `level`，战斗曲 0.8（−1.9 dB；
+  实测 mean 音量 menu −15.3 dB、bgm 前奏 −18.2 / 战斗段 −16.8 dB，数字上战斗曲本就更轻，但用户在战斗音效叠加下觉得偏响，按用户）。
+- ⇒ GOTCHAS #20（音效先于音乐 = 音乐还在下载/解码；换曲子先量码率和开头响度）。
+- 下一步：用户在 quarkspace.top 听开站到 BGM 的间隔与 0.8 的观感；不够再动 128k→96k 或 level 0.7。

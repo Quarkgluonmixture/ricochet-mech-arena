@@ -13,7 +13,8 @@
     `lastSafe === 0` 时提前），命中后再 hold 0.7 s + 0.4 s 回正；导演模式（观战 / attract / 玩家死后）镜头甩向残骸 + 击杀者；
     黑边 + 字幕；音效变调、音乐低通。主循环两套时钟 `dt` / `sdt`（GOTCHAS #18）。
   - **开站声音**：浏览器 autoplay 按 origin 放行，新域名第一次必静音到第一次点击（GOTCHAS #19）；被拦时页脚显示
-    「声音 · 点一下任意处开启」。
+    「声音 · 点一下任意处开启」。菜单曲开页即预载、1 s 淡入、从 1.5 s 起播（开头 2 s 是 −37 dB 的静场）；attract 音效
+    等音乐真起来才解除静音（GOTCHAS #20）；战斗曲 level 0.8。
 - **cursor**：`docs/ROADMAP.md` → M3 已 ship；观赏性 2（击杀慢镜头）已 ship；下一步 = 观赏性 3（地形美术），见 `TODO.md`。
 - ⚠ **今天下午之后的改动没有一项经真人玩过**（矮墙之后的全部，含击杀慢镜头）。真人验证清单在 `TODO.md` 第一节，
   先让用户玩，再决定改什么。
@@ -50,7 +51,8 @@
   机甲概念图 `assets-src/mech-concept.png`。
 - **音效**：Kenney CC0 原包在 `/tmp/kenney`（会丢，重下见 LOG 2026-09-13「性能、音效」条）；ffmpeg 转 AAC 进
   `public/audio/sfx/`；文件名表在 `src/ui/audio.ts` 的 `SFX`。
-- **音乐**：`public/audio/menu.mp3`、`bgm.mp3`；战斗曲 start/loopStart 偏移在 `src/main.ts` 的 `MUSIC`。
+- **音乐**：`public/audio/menu.mp3`、`bgm.mp3`（128 kbps；2026-09-14 从 188 kbps 重编，原件在 git 历史 `a8bdb0a:public/audio/*.mp3`）；
+  start / loopStart / fadeIn / level 都在 `src/main.ts` 的 `MUSIC`。换曲子先 `ffprobe` 码率 + 量开头 2 s 响度再定 `start`。
 - Node ≥ 22.6 直跑 TS：`erasableSyntaxOnly`，⛔ 构造器参数属性（`constructor(private x)`）不能用。
 - 测试：`npm test`（vitest，`src/sim/` + 纯函数的 `src/ui/slowmo.ts`，31 条）。改 AI 打分或几何后必跑；改渲染后必截图。
 
