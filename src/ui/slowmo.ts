@@ -16,8 +16,9 @@ export interface SlowMoParams {
   release: number;
 }
 
-/** The kill cam: ¼ speed for just under a second, a beat longer than the hit itself (TODO "一秒多"). */
-export const KILLCAM: SlowMoParams = { floor: 0.25, attack: 0.06, hold: 0.85, release: 0.4 };
+/** The kill cam: ¼ speed, held from the hit. The run-up comes from `predictImpacts` starting the effect a
+ *  beat BEFORE the shell lands (user, 2026-09-14: "再往前一点"), and the hit itself restarts the hold. */
+export const KILLCAM: SlowMoParams = { floor: 0.25, attack: 0.06, hold: 0.7, release: 0.4 };
 
 const smooth = (f: number) => f * f * (3 - 2 * f);
 

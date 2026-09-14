@@ -3,6 +3,7 @@ import { MAP_A, buildArena } from './sim/arena.ts';
 import { CFG } from './sim/config.ts';
 import { type Vec2, forward, norm, right } from './sim/geom.ts';
 import type { Mech, MechInput, Team } from './sim/mech.ts';
+import { predictImpacts } from './sim/predict.ts';
 import { World } from './sim/world.ts';
 import { TEX } from './render/assets.ts';
 import { CameraRig } from './render/camera.ts';
@@ -56,6 +57,11 @@ let shellViews = new ShellViews(scene, () => COLORS.you, QUALITY[settings.qualit
  *  not mech objects: the roster can be rebuilt underneath it (GOTCHAS #16). */
 const slowmo = new SlowMo();
 let killcam: { victim: number; shooter: number } | null = null;
+/** Start the kill cam this many SIM seconds before a predicted fatal hit (≈ 4× that in real time at the
+ *  floor), so the shell is seen arriving. The hit itself then restarts the hold. */
+const KILLCAM_LEAD = 0.12;
+/** Shell id the kill cam was pre-armed on, so one approaching shell triggers once. */
+let armedShell = -1;
 
 function buildRoster(n: number): void {
   for (const s of slots) { s.view.dispose(); s.marker.dispose(); s.trail.dispose(); }
@@ -71,7 +77,7 @@ function buildRoster(n: number): void {
   shellViews.sync([]);
   shellViews = new ShellViews(scene, (owner) => teamColor(world.mechs[owner]?.team ?? 'red'), QUALITY[settings.quality].shellLights);
   hud.clearFeed();
-  killcam = null; slowmo.reset(); spec.focus(null);
+  killcam = null; armedShell = -1; slowmo.reset(); spec.focus(null);
   applyLives();
 }
 
@@ -86,6 +92,8 @@ const MUSIC = {
 };
 let locked = false;
 let spectating = false;
+/** The browser refused to start audio without a gesture (a site it has not seen you use before). */
+let autoplayBlocked = false;
 /** Attract mode: AI vs AI behind the menu, HUD hidden, effects muted. On until the first Play/Watch. */
 let attract = false;
 let gameStarted = false;
@@ -179,7 +187,7 @@ const loadingTick = setInterval(() => {
 function refreshMenuText(): void {
   hud.relabel();
   hud.setOverlay(hud.overlayVisible, gameStarted);
-  hud.setMusicStatus(audio.currentTrack ? t('music.track', { name: audio.currentTrack.split('/').pop() ?? '' }) : t('music.none'));
+  hud.setMusicStatus(musicStatusText());
   const hint = document.querySelector('#watch .hint');
   if (hint) hint.textContent = t(settings.matchSize > 1 ? 'menu.watch.hint.team' : 'menu.watch.hint');
 }
@@ -237,20 +245,27 @@ applySettings();
 refreshMenuText();
 
 let musicPhase: 'none' | 'menu' | 'game' = 'none';
+function musicStatusText(): string {
+  const cur = audio.currentTrack;
+  if (cur) return t('music.track', { name: cur.split('/').pop() ?? '' });
+  return autoplayBlocked ? t('music.blocked') : t('music.none');
+}
 async function music(phase: 'menu' | 'game'): Promise<void> {
   if (musicPhase === phase) return;
   musicPhase = phase;
   const track = phase === 'game' ? MUSIC.game : MUSIC.menu;
   // the menu track eases in over 4 s: it is the first thing you hear when the page opens
   await audio.playTrack(track.url, phase === 'menu' ? 4 : 2, { start: track.start, loopStart: track.loopStart });
-  const cur = audio.currentTrack;
-  hud.setMusicStatus(cur ? t('music.track', { name: cur.split('/').pop() ?? '' }) : t('music.none'));
+  hud.setMusicStatus(musicStatusText());
 }
 // Menu music should be playing the moment the site opens. Browsers only allow that for sites you have
-// used before; try, and if the context stays suspended fall back to the first click or key.
-const firstGesture = () => { audio.unlock(); if (musicPhase === 'none') void music('menu'); };
+// used before (Chrome's media engagement is per origin: a first visit to a new domain is always silent);
+// try, and if the context stays suspended say so in the footer and fall back to the first click or key.
+const firstGesture = () => { autoplayBlocked = false; audio.unlock(); if (musicPhase === 'none') void music('menu'); };
 void audio.tryAutostart().then((ok) => {
   if (ok) { if (musicPhase === 'none') void music('menu'); return; }
+  autoplayBlocked = true;
+  hud.setMusicStatus(musicStatusText());
   document.addEventListener('pointerdown', firstGesture, { once: true });
   document.addEventListener('keydown', firstGesture, { once: true });
 });
@@ -270,12 +285,12 @@ document.addEventListener('keydown', (e) => {
   if (spectating) {
     if (e.code === 'Escape') setSpectate(false);
     if (e.code === 'KeyV') spec.toggle();
-    if (e.code === 'KeyR') world.resetRound();
+    if (e.code === 'KeyR') resetRoundNow();
     return;
   }
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'Space') dashPressed = true;
   if (e.code === 'KeyV') hud.setCamMode(rig.toggle());
-  if (e.code === 'KeyR') world.resetRound();
+  if (e.code === 'KeyR') resetRoundNow();
 });
 document.addEventListener('keyup', (e) => keys.delete(e.code));
 document.addEventListener('mousemove', (e) => {
@@ -305,11 +320,11 @@ const play = () => {
   audio.ui('confirm');
   void music('game');
   setAttract(false);
-  if (!gameStarted) { ensureRoster('pve'); world.resetMatch(); yaw = player.torsoYaw; rig.pitch = 0; gameStarted = true; hud.clearFeed(); applyRosterLimits(); applyLives(); }
+  if (!gameStarted) { ensureRoster('pve'); resetMatchNow(); gameStarted = true; hud.clearFeed(); applyRosterLimits(); applyLives(); }
   renderer.domElement.requestPointerLock();
 };
 $('play').addEventListener('click', play);
-$('watch').addEventListener('click', () => { audio.unlock(); audio.ui('confirm'); void music('game'); if (!gameStarted) world.resetMatch(); setSpectate(true); });
+$('watch').addEventListener('click', () => { audio.unlock(); audio.ui('confirm'); void music('game'); if (!gameStarted) resetMatchNow(); setSpectate(true); });
 view.addEventListener('click', () => { if (!locked && !spectating && !hud.overlayVisible) play(); });
 
 function playerInput(): MechInput {
@@ -376,8 +391,9 @@ function handleEvents(): void {
         }
         audio.hit(e.pos);
         fx.hit(e.pos.x, e.pos.z, teamColor(victim.team));
-        slowmo.trigger();
+        slowmo.trigger(); // restarts the hold from the hit, whether or not the run-up already started it
         killcam = { victim: victim.id, shooter: shooter.id };
+        armedShell = -1;
         if (attract) break;
         const own = shooter.id === victim.id;
         const friendly = !own && shooter.team === victim.team;
@@ -397,18 +413,28 @@ function handleEvents(): void {
         break;
       }
       case 'round':
-        roundAnnounced = false;
-        yaw = player.torsoYaw;
-        rig.pitch = 0;
-        killcam = null; slowmo.reset(); // a manual reset mid kill cam must not leave the camera on a respawned mech
-        for (const s of slots) s.trail.reset();
-        if (!attract) audio.round();
+        onRound();
         break;
       default:
         break;
     }
   }
 }
+
+/** A new round started: re-sync the camera yaw, drop trails and any kill cam still running. Called from the
+ *  'round' event (the automatic reset inside World.step) AND directly after a manual reset — World.step clears
+ *  the event list at the start of the next step, so an event pushed by a direct resetRound()/resetMatch() call
+ *  never reaches handleEvents. Before this helper R mid kill cam left the camera glued to the respawned mech. */
+function onRound(): void {
+  roundAnnounced = false;
+  yaw = player.torsoYaw;
+  rig.pitch = 0;
+  killcam = null; armedShell = -1; slowmo.reset();
+  for (const s of slots) s.trail.reset();
+  if (!attract) audio.round();
+}
+function resetRoundNow(): void { world.resetRound(); onRound(); }
+function resetMatchNow(): void { world.resetMatch(); onRound(); }
 
 // ---- loop -----------------------------------------------------------------------------------
 const STEP = 1 / 120;
@@ -426,6 +452,24 @@ function simStep(input: MechInput | null): void {
   });
   world.step(STEP, inputs);
   handleEvents();
+  anticipateKill();
+}
+
+/** Start the kill cam a beat before a fatal hit lands. A human on the last life is taken at face value
+ *  (nobody sidesteps in 0.12 s); an AI only counts once its dodge search has come up empty, because an AI
+ *  with a safe move left will usually take it and a slow-motion near miss every few seconds gets old. */
+function anticipateKill(): void {
+  if (slowmo.active && armedShell >= 0) return;
+  for (const im of predictImpacts(world, KILLCAM_LEAD)) {
+    if (!im.fatal) continue;
+    const victim = world.mechs[im.victim];
+    const human = victim.isPlayer && !aiVsAi();
+    if (!human && slots[victim.id].state.lastSafe > 0) continue;
+    armedShell = im.shell;
+    slowmo.trigger();
+    killcam = { victim: victim.id, shooter: im.owner };
+    return;
+  }
 }
 
 function nearestEnemy(): Mech | null {
@@ -528,7 +572,8 @@ window.rma = {
       alive: { blue: world.alive('blue').length, red: world.alive('red').length },
       aiSafe: slots[enemy.id].state.lastSafe, aiCandidates: slots[enemy.id].state.lastCandidates, aiSolution: slots[enemy.id].state.solution, stats: { ...stats, fires: [...stats.fires] },
       drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, music: audio.currentTrack,
-      timeScale: slowmo.scale, killcam: killcam ? { ...killcam, focusing: spec.focusing } : null, camera: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+      timeScale: slowmo.scale, killcam: killcam ? { ...killcam, focusing: spec.focusing, armedShell } : null, camera: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+      autoplayBlocked, matchSize: settings.matchSize,
     };
   },
 };
