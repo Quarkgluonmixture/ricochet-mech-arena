@@ -299,6 +299,9 @@ export class Audio {
   private music: { url: string; gain: GainNode; timer: number; sources: AudioBufferSourceNode[] } | null = null;
   private static OVERLAP = 2.5;
 
+  /** Start fetching + decoding a track now so playTrack() later is instant. Safe at page load. */
+  preloadTrack(url: string): Promise<boolean> { return this.loadTrack(url).then((b) => b !== null); }
+
   /** Fetch + decode once per URL. A missing or undecodable file resolves to null, never throws. */
   private loadTrack(url: string): Promise<AudioBuffer | null> {
     let p = this.tracks.get(url);
@@ -327,8 +330,9 @@ export class Audio {
    *
    * `start` = where the FIRST pass begins (e.g. skip a cold open), `loopStart` = where every later pass
    * begins (e.g. after an intro): "17 s to 33 s is the intro, from 33 s it is the fight" → start 17, loopStart 33.
+   * `level` = this track's gain relative to the music volume (1 = as mixed), for balancing tracks against each other.
    */
-  async playTrack(url: string, fadeIn = 2, opts: { start?: number; loopStart?: number } = {}): Promise<boolean> {
+  async playTrack(url: string, fadeIn = 2, opts: { start?: number; loopStart?: number; level?: number } = {}): Promise<boolean> {
     const buf = await this.loadTrack(url);
     if (!buf) return false;
     if (this.music && this.music.url === url) return true;
@@ -338,7 +342,7 @@ export class Audio {
     const loopAt = Math.min(opts.loopStart ?? 0, Math.max(0, buf.duration - 1));
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(1, ctx.currentTime + fadeIn);
+    gain.gain.linearRampToValueAtTime(opts.level ?? 1, ctx.currentTime + fadeIn);
     gain.connect(this.musicBus);
     const entry = { url, gain, timer: 0, sources: [] as AudioBufferSourceNode[] };
     this.music = entry;

@@ -90,13 +90,18 @@ at the top left names every kill and how it landed. Spawns: `P`/`B` blue, `E`/`R
   down and low-passed, explosion, dash, engine hum per live shell, UI) with a
   synthesised sub-thump under each shot, positioned by bearing and distance, sent through a shared reverb
   and summed into a compressor. Credits in `public/audio/sfx/CREDITS.txt`.
-- Music: two Suno tracks by the user. `public/audio/menu.mp3` ("Hangar Silence") loops on the start screen
-  from the moment the page opens when the browser allows it, otherwise from the first click or key. Chrome's
-  autoplay allowance is per origin and earned by use, so a first visit to a new domain is silent until you
-  click; the footer then reads "sound · click anywhere to start" instead of the track name. `public/audio/bgm.mp3` ("Chrome Pulse") is the fight track: it has a cold open, an intro from
-  17 s and the fight from 33 s, so Play or Watch starts it at 17 s once and then loops 33 s → end. Offsets
-  live in `MUSIC` in `src/main.ts`. Loops crossfade the last 2.5 s of each pass into the next, so any
-  exported song loops without a click or a gap. Music ducks while paused. No file, no music, no error.
+- Music: two Suno tracks by the user, stored at 128 kbps (re-encoded from 188 kbps on 2026-09-14 so the
+  first one arrives sooner; 5.3 → 3.6 MB and 4.7 → 3.2 MB). `public/audio/menu.mp3` ("Hangar Silence") is
+  fetched and decoded the moment the page loads and plays on the start screen from 1.5 s in (its first two
+  seconds sit at −37 dB) with a 1 s fade, as soon as the browser allows audio — otherwise from the first click
+  or key. Chrome's autoplay allowance is per origin and earned by use, so a first visit to a new domain is
+  silent until you click; the footer then reads "sound · click anywhere to start" instead of the track name.
+  The attract scene's effects stay muted until the music is actually playing, so the fight behind the menu is
+  never the first thing you hear. `public/audio/bgm.mp3` ("Chrome Pulse") is the fight track at 0.8 of the
+  music volume: it has a cold open, an intro from 17 s and the fight from 33 s, so Play or Watch starts it at
+  17 s once and then loops 33 s → end. Offsets, fades and levels live in `MUSIC` in `src/main.ts`. Loops
+  crossfade the last 2.5 s of each pass into the next, so any exported song loops without a click or a gap.
+  Music ducks while paused. No file, no music, no error.
 - Mechs: procedural walkers built from bevelled armour slabs over a dark frame, modelled after a concept
   sheet generated with the Codex image tool (`assets-src/mech-concept.png`): exposed hip and knee joints,
   a piston behind each shin, an angled chest plate, squared pauldrons with a team stripe, a sensor head with

@@ -86,9 +86,12 @@ const teamIndex = (m: Mech) => world.mechs.filter((o) => o.team === m.team && o.
 const nameOf = (m: Mech) => (m.isPlayer && !aiVsAi() ? t('name.you') : t(m.team === 'blue' ? 'name.blue' : 'name.red', { n: teamIndex(m) }));
 
 // ---- modes ----------------------------------------------------------------------------------
+/** `fadeIn` in real seconds; `level` is the track's gain relative to the music volume. The fight track sits a
+ *  touch under the menu track (user, 2026-09-14: "战斗的 bgm 稍微减弱一点点"). */
 const MUSIC = {
-  menu: { url: 'audio/menu.mp3', start: 0, loopStart: 0 },
-  game: { url: 'audio/bgm.mp3', start: 17, loopStart: 33 },
+  // the menu track opens with ~2 s at −37 dB; start past it so the first audible beat lands at once
+  menu: { url: 'audio/menu.mp3', start: 1.5, loopStart: 0, fadeIn: 1, level: 1 },
+  game: { url: 'audio/bgm.mp3', start: 17, loopStart: 33, fadeIn: 2, level: 0.8 },
 };
 let locked = false;
 let spectating = false;
@@ -113,7 +116,9 @@ const aiVsAi = () => spectating || attract;
 
 function applyDuck(): void {
   const paused = hud.overlayVisible;
-  audio.setDuck(attract ? 0.1 : paused ? 0 : 1, paused && !attract ? 0.35 : 1);
+  // attract: effects stay fully muted until the music is actually playing, so the first thing heard on
+  // opening the site is the menu track, not the AI fight behind it (the 5 MB track has to download first)
+  audio.setDuck(attract ? (audio.hasMusic ? 0.1 : 0) : paused ? 0 : 1, paused && !attract ? 0.35 : 1);
 }
 
 /** The human takes CFG.player.lives; every AI-driven mech, the human's included, fights on one. */
@@ -254,10 +259,12 @@ async function music(phase: 'menu' | 'game'): Promise<void> {
   if (musicPhase === phase) return;
   musicPhase = phase;
   const track = phase === 'game' ? MUSIC.game : MUSIC.menu;
-  // the menu track eases in over 4 s: it is the first thing you hear when the page opens
-  await audio.playTrack(track.url, phase === 'menu' ? 4 : 2, { start: track.start, loopStart: track.loopStart });
+  await audio.playTrack(track.url, track.fadeIn, { start: track.start, loopStart: track.loopStart, level: track.level });
   hud.setMusicStatus(musicStatusText());
+  applyDuck(); // attract effects come up only now that the music is on
 }
+// Fetch + decode the menu track at once (it gates everything else you hear), then the fight track behind it.
+void audio.preloadTrack(MUSIC.menu.url).then(() => audio.preloadTrack(MUSIC.game.url));
 // Menu music should be playing the moment the site opens. Browsers only allow that for sites you have
 // used before (Chrome's media engagement is per origin: a first visit to a new domain is always silent);
 // try, and if the context stays suspended say so in the footer and fall back to the first click or key.
