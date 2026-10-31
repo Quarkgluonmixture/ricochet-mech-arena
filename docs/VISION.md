@@ -3,9 +3,10 @@
 **Gold standard for this repo.** When a design call is unclear, decide by this file and write down which
 section you used. Higher than ROADMAP, higher than the current code.
 
-## §1 The game in one paragraph
+## §1 The game and its central experience
 
-A first-person duel in a walled arena. You pilot a mech. Shells are slow, glowing, and **bounce off walls**.
+The central pleasure is watching agile AI dodge crossing ricochets and seize an opening to fire back.
+Player-vs-AI and AI-vs-AI spectating both serve this experience. In the player mode, it is a first-person duel in a walled arena. You pilot a mech. Shells are slow, glowing, and **bounce off walls**.
 The enemy mech is an AI that **dodges perfectly** within the *same* movement limits you have (speed cap,
 inertia, dash cooldown). It also shoots back, including bank shots off walls. Direct shots never land on it.
 You win by **geometry**: corner it, bounce a shell in from a side it cannot see, or make two shells converge
@@ -13,7 +14,14 @@ so no reachable point is safe. It kills you the same way. One hit kills.
 
 The reference feeling is the 2D bouncing-shell tank games (Wii Play *Tanks!*, Tank Trouble) where the AI
 tanks slide around your ricochets with inhuman precision, and you learn to trap them instead of aiming at
-them. This repo is that feeling in 3D, from inside the cockpit.
+them. This repo brings that feeling into 3D, both from inside the cockpit and as a spectator.
+
+Owner excerpt, 2026-10-31: “爽点就是看 AI 怎么灵活身法躲避的同时 还能反击”。
+
+**Owner decision, 2026-10-31** (confirmed intent, summarized): the soul is AI footwork and counterattack,
+including AI-vs-AI 2v2, 3v3 and 4v4 under dense, intersecting trajectories. More shells and mechs should
+still leave orderly, understandable dodges and counterattacks to watch. These are direction and experience
+criteria, not a claim that every roster has shipped; shipped modes are documented in [README](../README.md).
 
 ## §2 Why a mech and not a tank (decided 2026-09-13)
 
@@ -71,11 +79,11 @@ The human has three lives per round; the AI has one. The asymmetry is deliberate
 lever: the AI's dodge is perfect, so the human's error budget is what makes the duel winnable, while the
 AI's one-hit death keeps "geometry kills" crisp. A non-fatal hit costs a life, flashes the screen, shakes
 the camera and grants 1.2 s of invulnerability so a single volley cannot strip every life. The round is
-decided only by a fatal hit. In AI-vs-AI (spectate, attract) both mechs have one life.
+decided only by a fatal hit. In AI-vs-AI (spectate, attract) each mech has one life.
 
 ## §4b Round resolution
 
-The first hit decides the round. From that step on every survivor is invulnerable and the AI stops
+In the human-vs-AI duel, the first fatal hit decides the round. From that step on every survivor is invulnerable and the AI stops
 shooting (it keeps dodging: a mech standing still reads as broken). Hits landing in the very same step as
 the first one still count, so a genuine trade is a draw. Otherwise a player who dies could still "win" from
 shells already in the air, which the first playtest correctly called nonsense.
@@ -114,5 +122,6 @@ and the build had zero pipeline. On 2026-09-13 the user asked for a visual pass 
 
 ## §7 Non-goals for now
 
-Multiplayer, progression, weapons other than the one shell type, health bars. Each of these would dilute the
-single loop: shoot, dodge, trap.
+Human network multiplayer, progression, weapons other than the one shell type, health bars.
+These excluded additions would dilute the single loop: shoot, dodge, trap.
+AI multi-mech spectating in §1 is not excluded by the network-multiplayer non-goal.
