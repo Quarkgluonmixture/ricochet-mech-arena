@@ -1,10 +1,11 @@
 # ricochet-mech-arena
 
-First-person mech duel with ricocheting shells. The enemy mech dodges perfectly inside the same movement
+A mech arena built around watching agile AI dodge ricocheting shells and counterattack, in player-vs-AI
+and AI-vs-AI modes. Player mode is a first-person duel. The enemy mech dodges perfectly inside the same movement
 limits you have. Direct shots never land. You win with geometry: corner it, bank a shell in from the side,
 or make two shells converge so nowhere it can reach is safe. It does the same to you. One hit kills.
 
-This README describes only what is shipped. Design intent lives in `docs/VISION.md`; stages in `docs/ROADMAP.md`.
+The mode descriptions below cover what is shipped; the 4v4 spectator goal in VISION is not listed as a shipped mode here. Design intent lives in `docs/VISION.md`; stages in `docs/ROADMAP.md`.
 
 ## Run
 
@@ -26,7 +27,7 @@ npm run build    # tsc + vite → dist/
 | V | first ↔ third person |
 | R | reset the round |
 | Esc | release the mouse |
-| T | **watch AI vs AI**: both mechs run the same brain; drag to orbit, wheel to zoom, V for top-down, Esc back |
+| T | **watch AI vs AI**: every mech runs the same brain; drag to orbit, wheel to zoom, V for top-down, Esc back |
 
 Open `?spectate` in the URL to start in spectator mode.
 
