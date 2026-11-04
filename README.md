@@ -13,6 +13,7 @@ The mode descriptions below cover what is shipped; the 4v4 spectator goal in VIS
 npm install
 npm run dev      # http://localhost:5173
 npm test         # node tests: the sim, plus the kill-cam clock (src/ui/slowmo.ts)
+npm run measure  # headless AI-vs-AI measurement (node, sim only; see Verified)
 npm run build    # tsc + vite → dist/
 ```
 
@@ -163,18 +164,74 @@ it actually gets to fire against a moving target. With a solution and nothing in
 shoot; without one for more than 0.8 s it hunts for an angle instead of standing where a zero-width line
 of sight exists but no shell-width shot does. It never reads your inputs.
 
-## Verified 2026-09-13 (headless Chromium, scripted player)
+## Verified 2026-11-04 (headless sim, `npm run measure`)
+
+`npm run measure` runs the simulation only (`src/sim/*`, no three.js, no DOM, no browser) at the game's
+fixed step of 1/120 s. It replays the shipped AI-vs-AI setup from `src/main.ts` — every mech on the same
+brain, `MAP_A`, spectate limits (4 shells in flight, 0.5 s cooldown), one life per mech, friendly fire on —
+for **300 simulated seconds** per roster. These are sim-time numbers, not wall-clock numbers: nothing here
+depends on frame rate, swiftshader, or the kill cam's real-time slowdown. The command also prints a 90 s
+snapshot from the same run, a machine-readable `[measure]` line per roster, and the metric definitions.
+
+| roster | shots blue / red | rounds decided | round length, start → decided (s) | trapped (0/17 safe moves) blue / red | min pair distance, any / enemy (m) | score |
+|---|---|---|---|---|---|---|
+| 1v1 | 402 / 387 | 3 | 35.89, 5.03, 18.53 (last round open at 234.52 s) | yes / yes | 1.960 / 1.960 | 1–2 |
+| 2v2 | 556 / 554 | 5 | 105.41, 58.77, 31.15, 37.58, 31.37 (open 25.69 s) | yes / yes | 1.400 / 2.066 | 1–4 |
+| 3v3 | 795 / 685 | 5 | 39.77, 51.30, 41.98, 86.67, 27.97 (open 42.26 s) | yes / yes | 1.400 / 1.400 | 1–4 |
+
+- **Rounds / lengths.** A round is decided by a whole-team wipe and restarts 2 s later; that 2 s is
+  excluded from its length. 1v1 / 2v2 / 3v3 started 4 / 6 / 6 rounds, the last still open at cut-off.
+  First fatal hits at 35.89 s (1v1), 24.53 s (2v2), 23.67 s (3v3). 1v1's fourth round never resolved:
+  after 65.47 s the two mechs kept firing (402 / 387 shots over the whole 300 s) without another kill
+  for the remaining 234.52 s. 2v2 needs 105.41 s for its first round, so a 90 s window reports **0 rounds**.
+- **Trapped.** Every team in every roster reached 0 of 17 safe moves at least once (episodes: 1v1 5 / 2,
+  2v2 13 / 9, 3v3 18 / 22). This is the same `lastSafe === 0` condition the kill cam uses.
+- **Min distance.** 1.400 m is exactly two mech radii: teammates do touch in 2v2 / 3v3 (collision volume),
+  while 1v1 never gets closer than 1.960 m. Enemies reached 1.400 m in 3v3 and 2.066 m in 2v2.
+- **Focus fire / crossfire** (defined in `LOG.md` 2026-09-13 23:00). Measured as frames where ≥ 2 alive
+  teammates hold the same live target, and as the bearing separation to that shared target at fire time.
+  1v1 has no mates. No friendly-fire hits occurred in any run; own goals did (2v2 1 / 0, 3v3 2 / 1).
+
+  | roster / team | focus frames | focus shots | shots with a mate ≥ 60° / ≥ 90° away | mean max bearing |
+  |---|---|---|---|---|
+  | 2v2 blue | 89.5% | 69.6% | 289 / 222 | 97.5° |
+  | 2v2 red | 87.0% | 67.9% | 166 / 105 | 61.8° |
+  | 3v3 blue | 91.9% | 67.4% | 371 / 300 | 97.4° |
+  | 3v3 red | 66.4% | 48.5% | 227 / 133 | 84.3° |
+
+  These are stance proxies: a bank shot's actual shell direction can differ from the bearing used here,
+  so the table does not prove two shells converged on one dodger.
+- **Determinism.** Two independent 300 s runs per roster produced byte-identical per-step traces
+  (sha256 `1e8203cce489c758…` / `a5429934d4d9cd79…` / `be4d7acd9d157675…`), and two separate
+  `npm run measure` processes produced identical `[measure]` output. `src/sim` has no RNG, clock reads or
+  mutable global config, so a fixed step plus a fixed start state gives a fixed outcome; any change to AI
+  scoring, geometry or shell rules changes the digest.
+- **90 s snapshot** (from the same runs, for comparison with the 2026-09-13 line below): 1v1 102 / 91 shots
+  and 3 rounds; 2v2 227 / 152 and 0 rounds; 3v3 234 / 226 and 1 round. **Not comparable** to the old
+  106 + 105 shots: that was a headless-Chromium run of the pre-teams build with the AI's 2-shell / 1 s
+  limits and frame-clamped `dt`; this one uses the shipped EvE limits and an exact fixed step.
+- `npm test` is unchanged at **31 tests / 7 files**, `npm run typecheck` is clean, and
+  `npm run measure` is 1 test. The measurement lives in `scripts/` behind its own vitest config, so
+  `npm test` never counts it as a pass or a failure.
+
+### Earlier 2026-09-13 verification — headless Chromium, scripted player (not retested 2026-11-04)
+
+Kept for the player-controlled duel, which the sim-only measurement above does not cover. These came from
+`window.rma.drive()` in headless Chromium (swiftshader, frame-clamped `dt`), not from a real machine, and
+were **not re-run** this time; see "Headless probe" below.
 
 - Scripted player with perfect direct aim, strafing, 40 shots in 20 s: **0 hits on the AI**.
 - AI first shot at 1.2 s, first kill at 1.6 s (direct hit on a player that does not dodge).
 - Standing player at spawn: killed at 9.2 s by a bank shot off the corridor wall.
-- Tests: the AI dodges a direct shot on open ground, dies in a 1.6 m corridor it cannot sidestep in,
+- Tests (node assertions recorded with the 2026-09-13 section; the suite still passes, 31 tests):
+  the AI dodges a direct shot on open ground, dies in a 1.6 m corridor it cannot sidestep in,
   never exceeds the speed cap; a bank-shot solution flown with the real shell model arrives after
   exactly one bounce; a shell that arrives after the round is decided cannot hit the survivor; shells
   fired against or 1 m off a wall bounce instead of tunnelling.
 - With the body-coupled torso (same duel, 15 s): 5 AI shots, first kill at 13.3 s; before it, 7 shots
   in 20 s and a kill at 1.6 s. The AI is deliberately less of a turret now.
 - AI vs AI, 90 s: 106 and 105 shots, 3 rounds, both sides trapped (0 safe moves) at some point.
+  **Superseded** by the 2026-11-04 numbers above (different build, limits and clock).
 
 ## Regenerating art
 
@@ -194,9 +251,11 @@ codex exec --sandbox workspace-write < assets-src/PROMPTS.md   # ~1 min per imag
 - `src/ui/` — HUD, radar, threat ring, WebAudio synth.
 - `src/main.ts` — input, fixed-step loop (120 Hz), event → feedback, `window.rma` probe for headless runs.
 - `tests/` — vitest, sim only.
+- `scripts/` — `npm run measure` (headless AI-vs-AI measurement, sim only) and `convert-assets.sh`.
 
 ## Headless probe
 
 `window.rma.drive(seconds, partialInput)` steps the sim without pointer lock; `window.rma.probe()` returns
-positions, kills, the AI's safe-move count and solution, draw calls. Used for the screenshots and the duel
-numbers above.
+positions, kills, the AI's safe-move count and solution, draw calls. Used for the screenshots and the
+2026-09-13 scripted-player duel numbers above. The 2026-11-04 team numbers do **not** come from this
+browser probe: they come from `npm run measure`, which steps `src/sim` directly in node.
